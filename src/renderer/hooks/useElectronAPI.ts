@@ -1,10 +1,11 @@
 import { useAppStore } from '../store';
-import type { AIRecommendation, AIRecommendationRequest, OBSConfig, OBSConnectionSettings, SystemInfo } from '../../shared/types';
+import type { AIRecommendation, AIRecommendationRequest, OBSConfig, OBSConnectionSettings, OBSSettingsSnapshot, SystemInfo } from '../../shared/types';
 
 export function useElectronAPI() {
   const setSystemInfo = useAppStore((state) => state.setSystemInfo);
   const setRecommendation = useAppStore((state) => state.setRecommendation);
   const setObsConnected = useAppStore((state) => state.setObsConnected);
+  const setObsSettingsSnapshot = useAppStore((state) => state.setObsSettingsSnapshot);
   const setObsMessage = useAppStore((state) => state.setObsMessage);
   const setError = useAppStore((state) => state.setError);
   const setIsApplying = useAppStore((state) => state.setIsApplying);
@@ -36,6 +37,15 @@ export function useElectronAPI() {
       const result = await window.electronAPI.obs.connect(settings);
       setObsConnected(result.success);
       setObsMessage(result.message);
+      if (result.success) {
+        const snapshotResult = await window.electronAPI.obs.getSettingsSnapshot();
+        if (snapshotResult.success && snapshotResult.snapshot) {
+          setObsSettingsSnapshot(snapshotResult.snapshot);
+        } else {
+          setObsSettingsSnapshot(null);
+          setObsMessage(snapshotResult.message);
+        }
+      }
       return result;
     } catch (error) {
       setObsConnected(false);
@@ -47,6 +57,7 @@ export function useElectronAPI() {
   const disconnectFromOBS = async () => {
     const result = await window.electronAPI.obs.disconnect();
     setObsConnected(false);
+    setObsSettingsSnapshot(null);
     setObsMessage(result.message);
     return result;
   };
@@ -77,6 +88,7 @@ declare global {
         connect: (settings: OBSConnectionSettings) => Promise<{ success: boolean; message: string }>;
         disconnect: () => Promise<{ success: boolean; message: string }>;
         getStatus: () => Promise<{ connected: boolean; message: string }>;
+        getSettingsSnapshot: () => Promise<{ success: boolean; message: string; snapshot?: OBSSettingsSnapshot }>;
         configure: (config: OBSConfig) => Promise<{ success: boolean; message: string }>;
       };
       system: {

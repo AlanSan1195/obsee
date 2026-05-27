@@ -5,6 +5,7 @@ import { PlatformSelector } from './components/PlatformSelector';
 import { AnalyzeButton } from './components/AnalyzeButton';
 import { PCAnalysis } from './components/PCAnalysis';
 import { Recommendations } from './components/Recommendations';
+import { OBSComparison } from './components/OBSComparison';
 import { ImportButton } from './components/ImportButton';
 import { StatusBar } from './components/StatusBar';
 
@@ -36,6 +37,7 @@ export default function App() {
         <AnalyzeButton />
         <PCAnalysis />
         <Recommendations />
+        <OBSComparison />
         <ImportButton />
       </main>
 

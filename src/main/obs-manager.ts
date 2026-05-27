@@ -1,5 +1,5 @@
 import OBSWebSocket from 'obs-websocket-js';
-import type { OBSConfig, OBSConnectionSettings, OBSPlatform } from '../shared/types';
+import type { OBSConfig, OBSConnectionSettings, OBSPlatform, OBSSettingsSnapshot } from '../shared/types';
 import { parseResolution } from '../shared/validation';
 
 const defaultConnectionSettings: OBSConnectionSettings = {
@@ -40,6 +40,21 @@ function getSimpleRecordingQuality(quality?: string): string {
     default:
       return 'HQ';
   }
+}
+
+function getStringSetting(settings: Record<string, unknown>, key: string): string {
+  const value = settings[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value : 'Unknown';
+}
+
+function getNumberSetting(settings: Record<string, unknown>, key: string): number {
+  const value = settings[key];
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
 }
 
 export class OBSManager {
@@ -106,6 +121,63 @@ export class OBSManager {
       connected: this.connected,
       message: this.connected ? 'Connected to OBS' : 'Disconnected',
     };
+  }
+
+  async getSettingsSnapshot(): Promise<{ success: boolean; message: string; snapshot?: OBSSettingsSnapshot }> {
+    if (!this.connected) {
+      return { success: false, message: 'Not connected to OBS. Please connect first.' };
+    }
+
+    try {
+      const [videoSettings, streamSettings] = await Promise.all([
+        this.obs.call('GetVideoSettings'),
+        this.obs.call('GetStreamServiceSettings'),
+      ]);
+
+      const streamServiceSettings = streamSettings.streamServiceSettings as Record<string, unknown>;
+      const profileSettings: Record<string, string> = {};
+      const profileRequests = [
+        { key: 'encoder', category: 'SimpleOutput', name: 'StreamEncoder' },
+        { key: 'bitrate', category: 'SimpleOutput', name: 'VBitrate' },
+        { key: 'audioBitrate', category: 'SimpleOutput', name: 'ABitrate' },
+        { key: 'recordingFormat', category: 'SimpleOutput', name: 'RecFormat' },
+        { key: 'recordingQuality', category: 'SimpleOutput', name: 'RecQuality' },
+      ];
+
+      await Promise.all(profileRequests.map(async (request) => {
+        try {
+          const response = await this.obs.call('GetProfileParameter', {
+            parameterCategory: request.category,
+            parameterName: request.name,
+          });
+          profileSettings[request.key] = response.parameterValue || response.defaultParameterValue || '';
+        } catch {
+          profileSettings[request.key] = '';
+        }
+      }));
+
+      const fpsDenominator = videoSettings.fpsDenominator || 1;
+      const fps = Math.round(videoSettings.fpsNumerator / fpsDenominator);
+
+      return {
+        success: true,
+        message: 'OBS settings loaded',
+        snapshot: {
+          streamServer: getStringSetting(streamServiceSettings, 'server'),
+          baseResolution: `${videoSettings.baseWidth}x${videoSettings.baseHeight}`,
+          outputResolution: `${videoSettings.outputWidth}x${videoSettings.outputHeight}`,
+          fps,
+          encoder: profileSettings.encoder || 'Unknown',
+          bitrate: getNumberSetting(profileSettings, 'bitrate'),
+          audioBitrate: getNumberSetting(profileSettings, 'audioBitrate'),
+          recordingFormat: profileSettings.recordingFormat || 'Unknown',
+          recordingQuality: profileSettings.recordingQuality || 'Unknown',
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, message: `Failed to read OBS settings: ${errorMessage}` };
+    }
   }
 
   async configure(config: OBSConfig): Promise<{ success: boolean; message: string }> {

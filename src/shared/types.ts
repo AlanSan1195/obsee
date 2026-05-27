@@ -30,6 +30,18 @@ export interface OBSConfig {
   streamKey?: string;
 }
 
+export interface OBSSettingsSnapshot {
+  streamServer: string;
+  baseResolution: string;
+  outputResolution: string;
+  fps: number;
+  encoder: string;
+  bitrate: number;
+  audioBitrate: number;
+  recordingFormat: string;
+  recordingQuality: string;
+}
+
 export interface SystemInfo {
   cpu: {
     model: string;

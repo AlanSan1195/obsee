@@ -71,6 +71,10 @@ ipcMain.handle('obs:get-status', async () => {
   return obsManager.getStatus();
 });
 
+ipcMain.handle('obs:get-settings-snapshot', async () => {
+  return obsManager.getSettingsSnapshot();
+});
+
 ipcMain.handle('obs:configure', async (_, config: unknown) => {
   const validation = validateOBSConfig(config);
   if (!validation.success) {

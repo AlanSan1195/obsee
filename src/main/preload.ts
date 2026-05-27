@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     connect: (settings: OBSConnectionSettings) => ipcRenderer.invoke('obs:connect', settings),
     disconnect: () => ipcRenderer.invoke('obs:disconnect'),
     getStatus: () => ipcRenderer.invoke('obs:get-status'),
+    getSettingsSnapshot: () => ipcRenderer.invoke('obs:get-settings-snapshot'),
     configure: (config: OBSConfig) => ipcRenderer.invoke('obs:configure', config),
   },
   system: {

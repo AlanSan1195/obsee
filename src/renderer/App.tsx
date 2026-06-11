@@ -6,6 +6,7 @@ import { AnalyzeButton } from './components/AnalyzeButton';
 import { PCAnalysis } from './components/PCAnalysis';
 import { Recommendations } from './components/Recommendations';
 import { OBSComparison } from './components/OBSComparison';
+import { AudioConfiguration } from './components/AudioConfiguration';
 import { ImportButton } from './components/ImportButton';
 import { StatusBar } from './components/StatusBar';
 
@@ -38,6 +39,7 @@ export default function App() {
         <PCAnalysis />
         <Recommendations />
         <OBSComparison />
+        <AudioConfiguration />
         <ImportButton />
       </main>
 

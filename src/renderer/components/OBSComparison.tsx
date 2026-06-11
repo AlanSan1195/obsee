@@ -5,14 +5,48 @@ type ComparisonRow = {
   label: string;
   current: string;
   recommended: string;
+  type?: 'encoder' | 'recordingQuality';
 };
 
 function normalize(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function isSameValue(current: string, recommended: string): boolean {
+function normalizeEncoder(value: string): string {
+  const normalized = normalize(value).replace(/[_-]/g, ' ');
+
+  if (normalized.includes('apple') || normalized.includes('videotoolbox')) return 'apple_h264';
+  if (normalized.includes('nvenc') || normalized.includes('nvidia')) return 'nvenc';
+  if (normalized.includes('qsv') || normalized.includes('quick sync') || normalized.includes('intel')) return 'qsv';
+  if (normalized.includes('amf') || normalized.includes('amd')) return 'amd';
+  if (normalized.includes('x264')) return 'x264';
+
+  return normalized;
+}
+
+function normalizeRecordingQuality(value: string): string {
+  const normalized = normalize(value).replace(/[_-]/g, ' ');
+
+  if (normalized === 'hq' || normalized === 'high') return 'high';
+  if (normalized === 'small' || normalized === 'medium') return 'medium';
+  if (normalized === 'stream' || normalized === 'same as stream' || normalized === 'same as stream encoder') return 'stream';
+  if (normalized === 'lossless') return 'lossless';
+
+  return normalized;
+}
+
+function isSameValue(row: ComparisonRow): boolean {
+  const { current, recommended } = row;
   if (current === '0' || current === 'Unknown') return false;
+
+  if (row.type === 'encoder') {
+    return normalizeEncoder(current) === normalizeEncoder(recommended);
+  }
+
+  if (row.type === 'recordingQuality') {
+    return normalizeRecordingQuality(current) === normalizeRecordingQuality(recommended);
+  }
+
   return normalize(current) === normalize(recommended);
 }
 
@@ -42,6 +76,7 @@ export function OBSComparison() {
       label: 'Encoder',
       current: obsSettingsSnapshot.encoder,
       recommended: recommendations.encoder,
+      type: 'encoder',
     },
     {
       label: 'Video bitrate',
@@ -62,10 +97,11 @@ export function OBSComparison() {
       label: 'Recording quality',
       current: obsSettingsSnapshot.recordingQuality,
       recommended: recommendations.recording_quality,
+      type: 'recordingQuality',
     },
   ];
 
-  const changeCount = rows.filter((row) => !isSameValue(row.current, row.recommended)).length;
+  const changeCount = rows.filter((row) => !isSameValue(row)).length;
 
   return (
     <div className="mb-8 rounded-xl border border-zinc-800 bg-zinc-900 p-6">
@@ -85,7 +121,7 @@ export function OBSComparison() {
           <span>Status</span>
         </div>
         {rows.map((row) => {
-          const same = isSameValue(row.current, row.recommended);
+          const same = isSameValue(row);
           return (
             <div
               key={row.label}

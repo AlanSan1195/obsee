@@ -5,7 +5,7 @@ import { chatWithAI } from './ai/serviceManager';
 import dotenv from 'dotenv';
 import type { AIRecommendationRequest } from '../shared/types';
 import { getLocalRecommendation } from '../shared/localRecommendation';
-import { validateAIRecommendation, validateAIRecommendationRequest, validateOBSConfig, validateOBSConnectionSettings } from '../shared/validation';
+import { validateAIRecommendation, validateAIRecommendationRequest, validateOBSAudioConfig, validateOBSConfig, validateOBSConnectionSettings } from '../shared/validation';
 
 dotenv.config();
 
@@ -75,6 +75,10 @@ ipcMain.handle('obs:get-settings-snapshot', async () => {
   return obsManager.getSettingsSnapshot();
 });
 
+ipcMain.handle('obs:get-audio-snapshot', async () => {
+  return obsManager.getAudioSnapshot();
+});
+
 ipcMain.handle('obs:configure', async (_, config: unknown) => {
   const validation = validateOBSConfig(config);
   if (!validation.success) {
@@ -82,6 +86,15 @@ ipcMain.handle('obs:configure', async (_, config: unknown) => {
   }
 
   return obsManager.configure(validation.value);
+});
+
+ipcMain.handle('obs:configure-audio', async (_, config: unknown) => {
+  const validation = validateOBSAudioConfig(config);
+  if (!validation.success) {
+    return { success: false, message: validation.message };
+  }
+
+  return obsManager.configureAudio(validation.value);
 });
 
 ipcMain.handle('system:get-info', async () => {

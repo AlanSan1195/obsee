@@ -42,6 +42,7 @@ En resumen: OBSREC busca ser una capa de diagnostico y acompanamiento para OBS, 
   - calidad de grabacion
 - Importacion de ajustes a OBS.
 - Comparacion entre ajustes actuales de OBS y ajustes recomendados.
+- Primera etapa de configuracion de audio documentada en [README_AUDIO.md](README_AUDIO.md).
 - Validacion de datos entre renderer y proceso main de Electron.
 - Scripts de lint y typecheck.
 
@@ -197,4 +198,3 @@ Cuando sea posible, es recomendable grabar en MKV para reducir el riesgo de perd
 GitHub:
 
 https://github.com/AlanSan1195/OBSREC
-

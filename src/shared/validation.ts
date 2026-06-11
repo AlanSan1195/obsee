@@ -1,4 +1,4 @@
-import type { AIRecommendation, AIRecommendationRequest, OBSConfig, OBSConnectionSettings, OBSMode, OBSPlatform, SystemInfo } from './types';
+import type { AIRecommendation, AIRecommendationRequest, OBSAudioConfig, OBSConfig, OBSConnectionSettings, OBSMode, OBSPlatform, SystemInfo } from './types';
 
 type ValidationResult<T> =
   | { success: true; value: T }
@@ -19,6 +19,10 @@ function isPositiveNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
 export function parseResolution(value: string): ValidationResult<{ width: number; height: number }> {
   const match = /^(\d{3,4})x(\d{3,4})$/.exec(value.trim());
   if (!match) {
@@ -33,6 +37,57 @@ export function parseResolution(value: string): ValidationResult<{ width: number
   }
 
   return { success: true, value: { width, height } };
+}
+
+export function validateOBSAudioConfig(value: unknown): ValidationResult<OBSAudioConfig> {
+  if (!isRecord(value)) {
+    return { success: false, message: 'Audio configuration must be an object.' };
+  }
+
+  if (!isNonEmptyString(value.inputName)) {
+    return { success: false, message: 'Audio input name is required.' };
+  }
+
+  if (typeof value.mono !== 'boolean') {
+    return { success: false, message: 'Audio mono setting must be a boolean.' };
+  }
+
+  if (!isRecord(value.filters)) {
+    return { success: false, message: 'Audio filter settings are required.' };
+  }
+
+  const { filters } = value;
+  if (!isFiniteNumber(filters.gainDb) || filters.gainDb < -30 || filters.gainDb > 30) {
+    return { success: false, message: 'Gain must be between -30 and 30 dB.' };
+  }
+
+  if (!isFiniteNumber(filters.compressorRatio) || filters.compressorRatio < 1 || filters.compressorRatio > 32) {
+    return { success: false, message: 'Compressor ratio must be between 1 and 32.' };
+  }
+
+  if (!isFiniteNumber(filters.compressorThresholdDb) || filters.compressorThresholdDb < -60 || filters.compressorThresholdDb > 0) {
+    return { success: false, message: 'Compressor threshold must be between -60 and 0 dB.' };
+  }
+
+  if (!isFiniteNumber(filters.limiterThresholdDb) || filters.limiterThresholdDb < -60 || filters.limiterThresholdDb > 0) {
+    return { success: false, message: 'Limiter threshold must be between -60 and 0 dB.' };
+  }
+
+  return {
+    success: true,
+    value: {
+      inputName: value.inputName.trim(),
+      deviceId: isNonEmptyString(value.deviceId) ? value.deviceId.trim() : undefined,
+      deviceName: isNonEmptyString(value.deviceName) ? value.deviceName.trim() : undefined,
+      mono: value.mono,
+      filters: {
+        gainDb: Number(filters.gainDb.toFixed(1)),
+        compressorRatio: Number(filters.compressorRatio.toFixed(1)),
+        compressorThresholdDb: Number(filters.compressorThresholdDb.toFixed(1)),
+        limiterThresholdDb: Number(filters.limiterThresholdDb.toFixed(1)),
+      },
+    },
+  };
 }
 
 export function validateOBSConfig(value: unknown): ValidationResult<OBSConfig> {
@@ -77,6 +132,15 @@ export function validateOBSConfig(value: unknown): ValidationResult<OBSConfig> {
     return { success: false, message: 'Recording format is required.' };
   }
 
+  let audio: OBSAudioConfig | undefined;
+  if (value.audio !== undefined) {
+    const audioValidation = validateOBSAudioConfig(value.audio);
+    if (!audioValidation.success) {
+      return audioValidation;
+    }
+    audio = audioValidation.value;
+  }
+
   return {
     success: true,
     value: {
@@ -90,6 +154,7 @@ export function validateOBSConfig(value: unknown): ValidationResult<OBSConfig> {
       recordingFormat: value.recordingFormat.trim().toLowerCase(),
       recordingQuality: isNonEmptyString(value.recordingQuality) ? value.recordingQuality.trim().toLowerCase() : undefined,
       streamKey: isNonEmptyString(value.streamKey) ? value.streamKey.trim() : undefined,
+      audio,
     },
   };
 }

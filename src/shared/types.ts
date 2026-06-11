@@ -17,6 +17,21 @@ export interface OBSConnectionSettings {
   password: string;
 }
 
+export interface OBSAudioFilterConfig {
+  gainDb: number;
+  compressorRatio: number;
+  compressorThresholdDb: number;
+  limiterThresholdDb: number;
+}
+
+export interface OBSAudioConfig {
+  inputName: string;
+  deviceId?: string;
+  deviceName?: string;
+  mono: boolean;
+  filters: OBSAudioFilterConfig;
+}
+
 export interface OBSConfig {
   mode: OBSMode;
   platform: OBSPlatform;
@@ -28,6 +43,42 @@ export interface OBSConfig {
   recordingFormat: string;
   recordingQuality?: string;
   streamKey?: string;
+  audio?: OBSAudioConfig;
+}
+
+export interface OBSAudioDevice {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  isRecommended: boolean;
+  score: number;
+  reason: string;
+}
+
+export interface OBSAudioFilterSnapshot {
+  name: string;
+  kind: string;
+  enabled: boolean;
+  settings: Record<string, unknown>;
+}
+
+export interface OBSAudioSettingsSnapshot {
+  inputName: string;
+  inputKind: string;
+  inputUuid?: string;
+  selectedDeviceId?: string;
+  selectedDeviceName?: string;
+  devices: OBSAudioDevice[];
+  recommendedDevice?: OBSAudioDevice;
+  muted: boolean;
+  volumeDb: number;
+  monitorType: string;
+  syncOffsetMs: number;
+  filters: OBSAudioFilterSnapshot[];
+  obsrecFiltersConfigured: boolean;
+  monoConfigured: boolean;
+  monoSupported: boolean;
+  warnings: string[];
 }
 
 export interface OBSSettingsSnapshot {
@@ -40,6 +91,7 @@ export interface OBSSettingsSnapshot {
   audioBitrate: number;
   recordingFormat: string;
   recordingQuality: string;
+  audio?: OBSAudioSettingsSnapshot;
 }
 
 export interface SystemInfo {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { useElectronAPI } from '../hooks/useElectronAPI';
+import { createDefaultAudioConfig } from './AudioConfiguration';
 
 export function ImportButton() {
   const [showPassword, setShowPassword] = useState(false);
@@ -9,6 +10,7 @@ export function ImportButton() {
     platform,
     recommendation,
     obsConnectionSettings,
+    obsAudioSnapshot,
     obsConnected,
     setObsConnectionSettings,
     setObsMessage,
@@ -33,6 +35,12 @@ export function ImportButton() {
         audioBitrate: recommendation.recommendations.audio_bitrate,
         recordingFormat: recommendation.recommendations.recording_format,
         recordingQuality: recommendation.recommendations.recording_quality,
+        audio: obsAudioSnapshot
+          ? createDefaultAudioConfig(
+            obsAudioSnapshot.inputName,
+            obsAudioSnapshot.recommendedDevice ?? obsAudioSnapshot.devices.find((device) => device.id === obsAudioSnapshot.selectedDeviceId),
+          )
+          : undefined,
       });
 
       if (result.success) {
@@ -40,8 +48,8 @@ export function ImportButton() {
       } else {
         setError(result.message);
       }
-    } catch {
-      setError('Failed to apply configuration');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'No se pudo aplicar la configuracion');
     }
   };
 
@@ -52,8 +60,8 @@ export function ImportButton() {
       if (!result.success) {
         setError(result.message);
       }
-    } catch {
-      setError('Failed to connect to OBS');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'No se pudo conectar con OBS');
     }
   };
 
@@ -64,7 +72,7 @@ export function ImportButton() {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_120px_1.5fr]">
             <label className="block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                OBS Host
+                Host de OBS
               </span>
               <input
                 value={obsConnectionSettings.host}
@@ -72,11 +80,11 @@ export function ImportButton() {
                 className="w-full rounded-lg border border-zinc-700 bg-black px-4 py-3 text-zinc-100 outline-none transition-colors focus:border-indigo-500"
                 spellCheck={false}
               />
-              <span className="mt-2 block text-xs text-zinc-600">Usually localhost.</span>
+              <span className="mt-2 block text-xs text-zinc-600">Normalmente localhost.</span>
             </label>
             <label className="block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                OBS Port
+                Puerto de OBS
               </span>
               <input
                 type="number"
@@ -86,11 +94,11 @@ export function ImportButton() {
                 onChange={(event) => setObsConnectionSettings({ port: Number(event.target.value) })}
                 className="w-full rounded-lg border border-zinc-700 bg-black px-4 py-3 text-zinc-100 outline-none transition-colors focus:border-indigo-500"
               />
-              <span className="mt-2 block text-xs text-zinc-600">Usually 4455, not 5173.</span>
+              <span className="mt-2 block text-xs text-zinc-600">Normalmente 4455, no 5173.</span>
             </label>
             <label className="block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                WebSocket Password
+                Password de WebSocket
               </span>
               <div className="flex rounded-lg border border-zinc-700 bg-black focus-within:border-indigo-500">
                 <input
@@ -104,10 +112,10 @@ export function ImportButton() {
                   onClick={() => setShowPassword((value) => !value)}
                   className="shrink-0 rounded-r-lg border-l border-zinc-700 px-4 text-sm font-semibold text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-200"
                 >
-                  {showPassword ? 'Hide' : 'Show'}
+                  {showPassword ? 'Ocultar' : 'Mostrar'}
                 </button>
               </div>
-              <span className="mt-2 block text-xs text-zinc-600">Leave blank only if OBS authentication is disabled.</span>
+              <span className="mt-2 block text-xs text-zinc-600">Dejalo vacio solo si la autenticacion de OBS esta desactivada.</span>
             </label>
           </div>
           <button
@@ -117,7 +125,7 @@ export function ImportButton() {
               transition-all duration-200 flex items-center justify-center gap-2"
           >
             <span>🔌</span>
-            <span>Connect to OBS</span>
+            <span>Conectar con OBS</span>
           </button>
         </div>
       ) : (
@@ -136,12 +144,12 @@ export function ImportButton() {
           {isApplying ? (
             <>
               <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-              <span>Applying...</span>
+              <span>Aplicando...</span>
             </>
           ) : (
             <>
               <span>⬆️</span>
-              <span>IMPORT TO OBS</span>
+              <span>IMPORTAR A OBS</span>
             </>
           )}
         </button>

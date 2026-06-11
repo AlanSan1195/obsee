@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AIRecommendation, OBSConnectionSettings, OBSMode, OBSPlatform, OBSSettingsSnapshot, SystemInfo } from '../shared/types';
+import type { AIRecommendation, OBSAudioSettingsSnapshot, OBSConnectionSettings, OBSMode, OBSPlatform, OBSSettingsSnapshot, SystemInfo } from '../shared/types';
 
 interface AppState {
   mode: OBSMode | null;
@@ -10,6 +10,7 @@ interface AppState {
   isApplying: boolean;
   obsConnectionSettings: OBSConnectionSettings;
   obsSettingsSnapshot: OBSSettingsSnapshot | null;
+  obsAudioSnapshot: OBSAudioSettingsSnapshot | null;
   obsConnected: boolean;
   obsMessage: string;
   error: string | null;
@@ -22,6 +23,7 @@ interface AppState {
   setIsApplying: (value: boolean) => void;
   setObsConnectionSettings: (settings: Partial<OBSConnectionSettings>) => void;
   setObsSettingsSnapshot: (snapshot: OBSSettingsSnapshot | null) => void;
+  setObsAudioSnapshot: (snapshot: OBSAudioSettingsSnapshot | null) => void;
   setObsConnected: (connected: boolean) => void;
   setObsMessage: (message: string) => void;
   setError: (error: string | null) => void;
@@ -41,6 +43,7 @@ export const useAppStore = create<AppState>((set) => ({
     password: '',
   },
   obsSettingsSnapshot: null,
+  obsAudioSnapshot: null,
   obsConnected: false,
   obsMessage: 'Disconnected from OBS',
   error: null,
@@ -58,6 +61,7 @@ export const useAppStore = create<AppState>((set) => ({
     },
   })),
   setObsSettingsSnapshot: (obsSettingsSnapshot) => set({ obsSettingsSnapshot }),
+  setObsAudioSnapshot: (obsAudioSnapshot) => set({ obsAudioSnapshot }),
   setObsConnected: (obsConnected) => set({ obsConnected }),
   setObsMessage: (obsMessage) => set({ obsMessage }),
   setError: (error) => set({ error }),
@@ -65,6 +69,7 @@ export const useAppStore = create<AppState>((set) => ({
     systemInfo: null,
     recommendation: null,
     obsSettingsSnapshot: null,
+    obsAudioSnapshot: null,
     error: null,
   }),
 }));

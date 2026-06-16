@@ -8,9 +8,11 @@
     "dev:vite": "vite",
     "dev:electron": "pnpm run build:main && wait-on tcp:5173 && electron . --dev",
     "build": "pnpm run build:main && pnpm run build:renderer && electron-builder",
-    "build:main": "tsc -p tsconfig.main.json",
+    "build:main": "node scripts/clean-main-dist.mjs && tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.json --noEmit",
+    "typecheck:api": "tsc --noEmit --target ES2022 --module CommonJS --moduleResolution node --esModuleInterop --skipLibCheck --strict api/health.ts api/recommendation.ts api/explanation.ts api/_lib/groq.ts api/_lib/http.ts api/_lib/rate-limit.ts",
+    "test:ai-backend": "node scripts/test-ai-backend.mjs",
     "lint": "eslint src",
     "test": "vitest run"
   },

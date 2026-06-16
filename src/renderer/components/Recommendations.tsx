@@ -177,6 +177,10 @@ function isUsableRecommendation(settings: RecommendationSettings): boolean {
   );
 }
 
+function getSourceLabel(source: AIRecommendation['source']): string {
+  return source === 'ai' ? 'IA integrada' : 'Recomendacion local';
+}
+
 export function Recommendations() {
   const {
     recommendation,
@@ -304,9 +308,15 @@ export function Recommendations() {
       {recommendation.source === 'local' && (
         <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
           <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>La IA no respondio. Esta es una recomendacion local de respaldo generada por OBSREC.</span>
+          <span>La IA integrada no respondio o alcanzo su limite. Esta es una recomendacion local de respaldo generada por OBSREC.</span>
         </div>
       )}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800/70 bg-zinc-950/60 p-3 text-xs text-zinc-400">
+        <span className="font-semibold uppercase tracking-wider text-indigo-300">
+          {getSourceLabel(recommendation.source)}
+        </span>
+        <span>Privacidad: solo se envia informacion tecnica del equipo, modo y plataforma; no se envian archivos ni claves de OBS.</span>
+      </div>
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Resolucion">
           <SelectField
@@ -373,7 +383,7 @@ export function Recommendations() {
                 ? 'IA recalculando'
                 : explanationSource === 'local'
                   ? 'Analisis actualizado'
-                  : 'IA actualizada'}
+                  : 'IA integrada actualizada'}
             </span>
           )}
         </div>

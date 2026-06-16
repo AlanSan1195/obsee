@@ -30,7 +30,7 @@ En resumen: OBSREC busca ser una capa de diagnostico y acompanamiento para OBS, 
   - GPU
   - RAM
   - sistema operativo
-- Recomendaciones de OBS usando IA via Groq.
+- Recomendaciones de OBS usando IA integrada via backend serverless.
 - Recomendacion local de respaldo si la IA falla.
 - Edicion manual antes de importar:
   - resolucion
@@ -82,7 +82,7 @@ La meta a largo plazo es que OBSREC ayude a responder preguntas como:
 - Tailwind CSS
 - Zustand
 - OBS WebSocket
-- Groq SDK
+- Groq SDK en backend
 - systeminformation
 
 ## Requisitos
@@ -91,7 +91,7 @@ La meta a largo plazo es que OBSREC ayude a responder preguntas como:
 - pnpm
 - OBS Studio
 - OBS WebSocket habilitado
-- API key de Groq para recomendaciones con IA
+- Backend de IA de OBSREC configurado para recomendaciones integradas
 
 OBS WebSocket viene integrado en versiones modernas de OBS. En OBS puedes abrir:
 
@@ -108,13 +108,25 @@ Valores locales recomendados:
 Copia `.env.example` a `.env` y completa tus valores.
 
 ```bash
-GROQ_API_KEY=
+OBSREC_AI_API_URL=http://localhost:3000
 OBS_WEBSOCKET_HOST=localhost
 OBS_WEBSOCKET_PORT=4455
 OBS_WEBSOCKET_PASSWORD=
 ```
 
 Los valores de conexion de OBS tambien pueden capturarse directamente desde la app.
+
+Las claves del proveedor de IA no deben incluirse en el build de Electron. Para produccion, configura estas variables solo en el backend de Vercel:
+
+```bash
+GROQ_API_KEY=
+GROQ_MODEL=openai/gpt-oss-120b
+OBSREC_AI_DAILY_LIMIT=20
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+```
+
+Si el backend no esta disponible o se alcanza el limite diario, OBSREC usa su recomendacion local de respaldo.
 
 ## Desarrollo
 
@@ -155,6 +167,20 @@ Crear build de produccion:
 pnpm run build
 ```
 
+Ejecutar backend serverless localmente con Vercel CLI:
+
+```bash
+vercel dev
+```
+
+Verificar solo los endpoints serverless:
+
+```bash
+pnpm run typecheck:api
+OBSREC_AI_API_URL=https://obsrec.vercel.app pnpm run test:ai-backend
+OBSREC_AI_API_URL=https://obsrec.vercel.app pnpm run test:ai-backend -- --ai
+```
+
 ## Estructura del Proyecto
 
 ```text
@@ -162,7 +188,17 @@ src/
   main/        Proceso main de Electron, IPC e integracion con OBS
   renderer/    Interfaz React
   shared/      Tipos compartidos, validadores y logica de recomendacion
+api/           Endpoints serverless de IA integrada para Vercel
 ```
+
+## Despliegue de IA Integrada
+
+1. Crea un proyecto en Vercel apuntando a este repositorio.
+2. Crea una base Redis en Upstash y copia las credenciales REST.
+3. Configura en Vercel: `GROQ_API_KEY`, `GROQ_MODEL`, `OBSREC_AI_DAILY_LIMIT`, `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`.
+4. Despliega y prueba `GET /api/health`.
+5. Ejecuta `pnpm run test:ai-backend -- --ai` apuntando `OBSREC_AI_API_URL` a la URL desplegada.
+6. Usa esa misma URL como `OBSREC_AI_API_URL` en la app de escritorio.
 
 ## Estado Actual
 
@@ -192,6 +228,8 @@ Siguientes pasos importantes:
 OBSREC modifica ajustes de OBS mediante WebSocket. Antes de usarlo para una transmision o grabacion importante, revisa los ajustes aplicados dentro de OBS.
 
 Cuando sea posible, es recomendable grabar en MKV para reducir el riesgo de perder una grabacion si OBS o el sistema fallan.
+
+La app de escritorio no debe contener `GROQ_API_KEY`. El backend recibe informacion tecnica del equipo, modo y plataforma para generar recomendaciones; no necesita archivos locales ni claves de OBS.
 
 ## Repositorio
 

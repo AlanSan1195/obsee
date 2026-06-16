@@ -1,12 +1,12 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { obsManager } from './obs-manager';
-import { chatWithAI } from './ai/serviceManager';
 import dotenv from 'dotenv';
 import type { AIRecommendationExplanationRequest, AIRecommendationRequest } from '../shared/types';
 import { getLocalRecommendation, getLocalRecommendationExplanation } from '../shared/localRecommendation';
-import { validateAIRecommendation, validateAIRecommendationExplanation, validateAIRecommendationExplanationRequest, validateAIRecommendationRequest, validateOBSAudioConfig, validateOBSConfig, validateOBSConnectionSettings } from '../shared/validation';
+import { validateAIRecommendationExplanationRequest, validateAIRecommendationRequest, validateOBSAudioConfig, validateOBSConfig, validateOBSConnectionSettings } from '../shared/validation';
 import { loadBackup } from './backup-store';
+import { getRemoteAIUserMessage, getRemoteRecommendation, getRemoteRecommendationExplanation } from './ai/remote';
 
 dotenv.config();
 
@@ -158,54 +158,15 @@ ipcMain.handle('ai:get-recommendation', async (_, rawRequest: unknown) => {
   }
 
   const request: AIRecommendationRequest = validation.value;
-  const { systemInfo, mode, platform } = request;
-  const prompt = `Eres un experto en configuración de OBS para streaming y grabación.
-Analiza el hardware del usuario y recomienda la mejor configuración posible.
-
-Preferencias del usuario:
-- Modo: ${mode}
-- Plataforma: ${platform}
-
-Hardware disponible:
-- CPU: ${systemInfo.cpu.model} (${systemInfo.cpu.cores} cores)
-- GPU: ${systemInfo.gpu.model} ${systemInfo.gpu.vram}MB VRAM (Vendor: ${systemInfo.gpu.vendor})
-- RAM: ${systemInfo.ram.total}GB
-- OS: ${systemInfo.os.distro} ${systemInfo.os.release}
-- Hardware NVENC disponible: ${systemInfo.gpu.hasNvenc ? 'Sí' : 'No'}
-
-Responde en JSON con este formato exacto, sin texto adicional:
-{
-  "recommendations": {
-    "resolution": "1920x1080",
-    "fps": 60,
-    "encoder": "nvenc",
-    "bitrate": 6000,
-    "audio_bitrate": 320,
-    "recording_format": "mkv",
-    "recording_quality": "high"
-  },
-  "reasoning": "Explicación de por qué esta configuración es óptima para este hardware"
-}`;
-
   try {
-    const response = await chatWithAI([
-      { role: 'system', content: 'Eres un experto en configuración de OBS. Responde solo en JSON.' },
-      { role: 'user', content: prompt }
-    ]);
-
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      const recommendation = validateAIRecommendation(parsed);
-      if (!recommendation.success) {
-        throw new Error(recommendation.message);
-      }
-      return { ...recommendation.value, source: 'ai' as const };
-    }
-    throw new Error('Respuesta de IA no contenía JSON válido');
+    return await getRemoteRecommendation(request);
   } catch (error) {
-    console.error('Error getting AI recommendation:', error);
-    return getLocalRecommendation(request);
+    console.error('Error getting integrated AI recommendation:', error);
+    const localRecommendation = getLocalRecommendation(request);
+    return {
+      ...localRecommendation,
+      reasoning: `${localRecommendation.reasoning} IA integrada no disponible: ${getRemoteAIUserMessage(error)}`,
+    };
   }
 });
 
@@ -216,61 +177,14 @@ ipcMain.handle('ai:explain-recommendation', async (_, rawRequest: unknown) => {
   }
 
   const request: AIRecommendationExplanationRequest = validation.value;
-  const { systemInfo, mode, platform, originalRecommendations, currentRecommendations, changedFields } = request;
-  const prompt = `Eres un experto en configuracion de OBS para streaming y grabacion.
-El usuario cambio manualmente una configuracion recomendada. Explica el probable resultado de estos cambios con lenguaje claro y util.
-
-Contexto:
-- Modo: ${mode}
-- Plataforma: ${platform}
-- CPU: ${systemInfo.cpu.model} (${systemInfo.cpu.cores} cores)
-- GPU: ${systemInfo.gpu.model} ${systemInfo.gpu.vram}MB VRAM (Vendor: ${systemInfo.gpu.vendor})
-- RAM: ${systemInfo.ram.total}GB
-- Hardware NVENC disponible: ${systemInfo.gpu.hasNvenc ? 'Si' : 'No'}
-
-Configuracion original:
-- Resolucion: ${originalRecommendations.resolution}
-- FPS: ${originalRecommendations.fps}
-- Encoder: ${originalRecommendations.encoder}
-- Bitrate de video: ${originalRecommendations.bitrate} kbps
-- Bitrate de audio: ${originalRecommendations.audio_bitrate} kbps
-- Formato de grabacion: ${originalRecommendations.recording_format}
-- Calidad de grabacion: ${originalRecommendations.recording_quality}
-
-Configuracion actual modificada:
-- Resolucion: ${currentRecommendations.resolution}
-- FPS: ${currentRecommendations.fps}
-- Encoder: ${currentRecommendations.encoder}
-- Bitrate de video: ${currentRecommendations.bitrate} kbps
-- Bitrate de audio: ${currentRecommendations.audio_bitrate} kbps
-- Formato de grabacion: ${currentRecommendations.recording_format}
-- Calidad de grabacion: ${currentRecommendations.recording_quality}
-
-Campos modificados: ${changedFields.join(', ')}
-
-Responde en JSON con este formato exacto, sin texto adicional:
-{
-  "reasoning": "Explicacion breve en espanol: menciona calidad esperada, estabilidad probable, carga de CPU/GPU/red y cualquier riesgo concreto del cambio."
-}`;
-
   try {
-    const response = await chatWithAI([
-      { role: 'system', content: 'Eres un experto en configuracion de OBS. Responde solo en JSON valido.' },
-      { role: 'user', content: prompt },
-    ]);
-
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      const explanation = validateAIRecommendationExplanation({ ...parsed, source: 'ai' });
-      if (!explanation.success) {
-        throw new Error(explanation.message);
-      }
-      return explanation.value;
-    }
-    throw new Error('Respuesta de IA no contenia JSON valido');
+    return await getRemoteRecommendationExplanation(request);
   } catch (error) {
-    console.error('Error explaining AI recommendation:', error);
-    return getLocalRecommendationExplanation(request);
+    console.error('Error explaining integrated AI recommendation:', error);
+    const localExplanation = getLocalRecommendationExplanation(request);
+    return {
+      ...localExplanation,
+      reasoning: `${localExplanation.reasoning} IA integrada no disponible: ${getRemoteAIUserMessage(error)}`,
+    };
   }
 });

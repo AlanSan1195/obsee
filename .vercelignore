@@ -1,0 +1,9 @@
+.env
+.env.local
+.env.*.local
+.git
+.vercel
+dist
+release
+node_modules
+plans

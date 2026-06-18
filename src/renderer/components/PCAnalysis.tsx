@@ -23,16 +23,16 @@ function SpecCard({
   detail?: string;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-zinc-800/60 bg-zinc-950/70 p-4">
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400">
+    <div className="flex items-start gap-3 rounded-none border border-border bg-white/[0.02] p-4">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-none border border-border bg-white/[0.02] text-text-muted">
         {icon}
       </span>
       <div className="min-w-0">
-        <span className="block text-xs uppercase tracking-wider text-zinc-500">{label}</span>
-        <span className="mt-0.5 block truncate text-sm font-medium text-zinc-100" title={value}>
+        <span className="block text-xs uppercase tracking-wider text-text-muted">{label}</span>
+        <span className="mt-0.5 block truncate text-sm font-medium text-text" title={value}>
           {value}
         </span>
-        {detail && <span className="text-xs text-zinc-500">{detail}</span>}
+        {detail && <span className="text-xs text-text-muted">{detail}</span>}
       </div>
     </div>
   );
@@ -43,10 +43,10 @@ export function PCAnalysis() {
 
   if (isAnalyzing) {
     return (
-      <Section title="Analisis del PC" icon={<IconCpu className="h-4 w-4" />}>
+      <Section title="hardware.scan" icon={<IconCpu className="h-4 w-4" />}>
         <div className="flex items-center gap-3">
           <Spinner />
-          <span className="text-sm text-zinc-400">Analizando tu sistema...</span>
+          <span className="text-sm text-text-muted">Analizando tu sistema...</span>
         </div>
       </Section>
     );
@@ -55,7 +55,7 @@ export function PCAnalysis() {
   if (!systemInfo) return null;
 
   return (
-    <Section title="Analisis del PC" icon={<IconCpu className="h-4 w-4" />}>
+    <Section title="hardware.scan" icon={<IconCpu className="h-4 w-4" />}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <SpecCard
           icon={<IconCpu className="h-4 w-4" />}
@@ -82,10 +82,10 @@ export function PCAnalysis() {
         />
       </div>
       <div
-        className={`mt-4 flex items-center gap-2 rounded-xl border px-4 py-3 text-sm ${
+        className={`mt-4 flex items-center gap-2 rounded-none border px-4 py-3 text-sm ${
           systemInfo.gpu.hasNvenc
-            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-            : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+            ? 'border-primary/30 bg-primary/10 text-primary'
+            : 'border-amber-500/30 bg-black text-amber-200'
         }`}
       >
         {systemInfo.gpu.hasNvenc ? (

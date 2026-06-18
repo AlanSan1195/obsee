@@ -213,7 +213,7 @@ export function Spinner({ className = 'h-5 w-5' }: IconProps) {
   return (
     <div
       aria-hidden="true"
-      className={`animate-spin rounded-full border-2 border-indigo-400 border-t-transparent ${className}`}
+      className={`animate-spin rounded-full border-2 border-primary border-t-transparent ${className}`}
     />
   );
 }
@@ -230,39 +230,51 @@ type SectionProps = {
 export function Section({ title, icon, subtitle, action, accent = false, children }: SectionProps) {
   return (
     <section
-      className={`rounded-2xl border p-6 backdrop-blur-sm transition-colors ${
+      className={`terminal-panel transition-colors ${
         accent
-          ? 'border-indigo-500/40 bg-indigo-500/[0.04] shadow-[0_0_50px_-16px_rgba(99,102,241,0.45)]'
-          : 'border-zinc-800/80 bg-zinc-900/60'
+          ? 'border-primary/40 '
+          : ''
       }`}
     >
-      <header className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3">
+      {/* terminal title bar */}
+      <header
+        className={`flex flex-col gap-2 border-b px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between ${
+          accent ? 'border-primary/25 bg-primary/[0.04]' : 'border-border bg-white/[0.012]'
+        }`}
+      >
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className={`h-2.5 w-2.5 shrink-0 ${accent ? 'bg-primary text-glow' : 'bg-text-muted/60'}`}
+            aria-hidden="true"
+          />
           {icon && (
-            <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${
-                accent
-                  ? 'border-indigo-500/40 bg-indigo-500/15 text-indigo-300'
-                  : 'border-zinc-700/80 bg-zinc-800/80 text-zinc-300'
-              }`}
-            >
+            <span className={`shrink-0 ${accent ? 'text-primary' : 'text-text-muted'}`}>
               {icon}
             </span>
           )}
-          <div>
-            <h3
-              className={`text-xs font-semibold uppercase tracking-[0.18em] ${
-                accent ? 'text-indigo-300' : 'text-zinc-400'
-              }`}
-            >
-              {title}
-            </h3>
-            {subtitle && <div className="mt-0.5 text-sm text-zinc-500">{subtitle}</div>}
-          </div>
+          <h3
+            className={`truncate text-sm font-medium lowercase tracking-terminal ${
+              accent ? 'text-primary text-glow' : 'text-text'
+            }`}
+          >
+            {title}
+          </h3>
         </div>
-        {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
+        {action ? (
+          <div className="flex flex-wrap items-center gap-2">{action}</div>
+        ) : (
+          <span className="hidden shrink-0 text-[0.65rem] lowercase tracking-terminal text-text-faint sm:block">
+            // {accent ? 'recommended' : 'module'}
+          </span>
+        )}
       </header>
-      {children}
+      {subtitle && (
+        <div className="border-b border-border/60 px-4 py-2 text-xs lowercase text-text-muted">
+          <span className="text-text-faint">$ </span>
+          {subtitle}
+        </div>
+      )}
+      <div className="p-4 sm:p-5">{children}</div>
     </section>
   );
 }

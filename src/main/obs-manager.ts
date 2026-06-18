@@ -69,14 +69,20 @@ export class OBSManager {
   async initialize() {
     this.obs.on('ConnectionError', (err: Error) => {
       console.error('OBS WebSocket error:', err);
+      const wasConnected = this.connected;
       this.connected = false;
-      this.emitStatus('Se perdió la conexión con OBS');
+      if (wasConnected) {
+        this.emitStatus('Se perdió la conexión con OBS');
+      }
     });
 
     this.obs.on('ConnectionClosed', () => {
       console.log('OBS connection closed');
+      const wasConnected = this.connected;
       this.connected = false;
-      this.emitStatus('OBS cerró la conexión');
+      if (wasConnected) {
+        this.emitStatus('OBS cerró la conexión');
+      }
     });
   }
 
@@ -95,9 +101,16 @@ export class OBSManager {
       return { success: true, message: 'Conectado a OBS' };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const helpMessage = errorMessage.toLowerCase().includes('authentication failed')
-        ? 'El password llego a OBS, pero OBS lo rechazo. Copialo otra vez desde los ajustes de OBS WebSocket o genera uno nuevo y luego pulsa Aplicar/Aceptar en OBS.'
-        : 'Revisa que OBS este abierto, que el servidor WebSocket este habilitado, que el puerto normalmente sea 4455 y que el password coincida con OBS.';
+      const lowerErrorMessage = errorMessage.toLowerCase();
+      let helpMessage = 'Revisa que OBS este abierto, que el servidor WebSocket este habilitado, que el puerto coincida con OBS y que el password solo se use si OBS tiene autenticacion activada.';
+
+      if (lowerErrorMessage.includes('authentication failed') || lowerErrorMessage.includes('authentication')) {
+        helpMessage = 'OBS requiere password o rechazo el password enviado. Si desactivaste la autenticacion, pulsa Aplicar/Aceptar en OBS y reinicia OBS; si sigue activada, copia el password actual.';
+      } else if (lowerErrorMessage.includes('econnrefused') || lowerErrorMessage.includes('connection refused')) {
+        helpMessage = `OBS no acepto la conexion. Revisa que OBS este abierto, que el servidor WebSocket este activado y que el puerto sea ${connectionSettings.port}.`;
+      } else if (lowerErrorMessage.includes('closed') || lowerErrorMessage.includes('close') || lowerErrorMessage.includes('socket hang up')) {
+        helpMessage = 'OBS cerro el intento de conexion. Revisa que el puerto sea correcto y que el servidor WebSocket este habilitado.';
+      }
 
       return {
         success: false,

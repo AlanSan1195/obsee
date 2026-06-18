@@ -124,6 +124,13 @@ describe('validateOBSConnectionSettings', () => {
     });
   });
 
+  it('acepta password vacio cuando OBS no usa autenticacion', () => {
+    expect(validateOBSConnectionSettings({ host: 'localhost', port: 4455, password: '' })).toEqual({
+      success: true,
+      value: { host: 'localhost', port: 4455, password: '' },
+    });
+  });
+
   it('rechaza el puerto del servidor de desarrollo', () => {
     expect(validateOBSConnectionSettings({ host: 'localhost', port: 5173, password: '' })).toEqual({
       success: false,

@@ -5,22 +5,23 @@ export function StatusBar() {
   const { obsConnected, obsMessage } = useAppStore();
 
   return (
-    <div className="mt-auto pt-6">
+    <div className="mt-8 pt-4">
       <div
         aria-live="polite"
-        className="flex items-center gap-3 rounded-xl border border-zinc-800/80 bg-zinc-900/60 px-4 py-3 backdrop-blur-sm"
+        className="flex items-center gap-3 border-t border-border px-1 py-3 text-xs lowercase tracking-terminal"
       >
-        <span aria-hidden="true" className="relative flex h-2.5 w-2.5 shrink-0">
-          {obsConnected && (
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-          )}
+        <span aria-hidden="true" className="flex shrink-0 items-center">
           <span
-            className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-              obsConnected ? 'bg-emerald-400' : 'bg-red-500'
+            className={`inline-block h-2 w-2 ${
+              obsConnected ? 'animate-pulse-dot bg-primary text-glow' : 'bg-red-500'
             }`}
           />
         </span>
-        <span className="text-sm text-zinc-400">{obsMessage}</span>
+        <span className="text-text-faint">obsrec@local:~$</span>
+        <span className="text-text-muted">{obsMessage}</span>
+        <span className="ml-auto hidden text-text-faint sm:block">
+          {obsConnected ? 'ws · connected' : 'ws · closed'}
+        </span>
       </div>
     </div>
   );

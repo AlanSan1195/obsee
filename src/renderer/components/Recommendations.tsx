@@ -30,8 +30,8 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block rounded-xl border border-zinc-800/60 bg-zinc-950/70 p-4 transition-colors focus-within:border-indigo-500/50">
-      <span className="mb-2 block text-xs uppercase tracking-wider text-zinc-500">{label}</span>
+    <label className="block rounded-none border border-border bg-white/[0.02] p-4 transition-colors focus-within:border-primary/50">
+      <span className="mb-2 block text-xs uppercase tracking-wider text-text-muted">{label}</span>
       {children}
     </label>
   );
@@ -74,7 +74,7 @@ function SelectField<T extends string | number>({
         onKeyDown={(event) => {
           if (event.key === 'Escape') setOpen(false);
         }}
-        className="flex min-h-9 w-full items-center justify-between gap-3 rounded-lg border border-transparent bg-zinc-900/70 px-3 py-2 text-left text-base font-medium text-white transition-colors hover:border-zinc-700 hover:bg-zinc-900 focus:border-indigo-500/60 focus:outline-none"
+        className="flex min-h-9 w-full items-center justify-between gap-3 rounded-none border border-transparent bg-white/[0.02] px-3 py-2 text-left text-base font-medium text-text transition-colors hover:border-border hover:bg-white/[0.02] focus:border-primary/60 focus:outline-none"
       >
         <span className="min-w-0 truncate">{displayValue}</span>
         <svg
@@ -85,7 +85,7 @@ function SelectField<T extends string | number>({
           strokeLinecap="round"
           strokeLinejoin="round"
           aria-hidden="true"
-          className={`h-4 w-4 shrink-0 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 shrink-0 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`}
         >
           <path d="m5 7.5 5 5 5-5" />
         </svg>
@@ -94,7 +94,7 @@ function SelectField<T extends string | number>({
       {open && (
         <div
           role="listbox"
-          className="absolute left-0 right-0 top-full z-30 mt-2 max-h-56 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-950 p-1 shadow-2xl shadow-black/40"
+          className="absolute left-0 right-0 top-full z-30 mt-2 max-h-56 overflow-y-auto rounded-none border border-border bg-background p-1 shadow-2xl shadow-black/40"
         >
           {options.map((option) => {
             const selected = String(option) === String(value);
@@ -108,14 +108,14 @@ function SelectField<T extends string | number>({
                   onChange(option);
                   setOpen(false);
                 }}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
+                className={`flex w-full items-center justify-between rounded-none px-3 py-2 text-left text-sm font-medium transition-colors ${
                   selected
-                    ? 'bg-indigo-500/15 text-indigo-200'
-                    : 'text-zinc-200 hover:bg-zinc-800'
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-text hover:bg-white/[0.04]'
                 }`}
               >
                 <span>{String(option).toUpperCase()}</span>
-                {selected && <span className="text-xs text-indigo-300">Actual</span>}
+                {selected && <span className="text-xs text-primary">Actual</span>}
               </button>
             );
           })}
@@ -149,9 +149,9 @@ function NumberField({
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="min-w-0 flex-1 bg-transparent text-base font-medium text-white outline-none"
+        className="min-w-0 flex-1 bg-transparent text-base font-medium text-text outline-none"
       />
-      <span className="shrink-0 text-sm font-medium text-zinc-400">{suffix}</span>
+      <span className="shrink-0 text-sm font-medium text-text-muted">{suffix}</span>
     </div>
   );
 }
@@ -274,10 +274,10 @@ export function Recommendations() {
 
   if (isAnalyzing) {
     return (
-      <Section title="Configuracion recomendada" icon={<IconSliders className="h-4 w-4" />}>
+      <Section title="config.recommended" icon={<IconSliders className="h-4 w-4" />}>
         <div className="flex items-center gap-3">
           <Spinner />
-          <span className="text-sm text-zinc-400">Obteniendo recomendaciones...</span>
+          <span className="text-sm text-text-muted">Obteniendo recomendaciones...</span>
         </div>
       </Section>
     );
@@ -304,15 +304,15 @@ export function Recommendations() {
   };
 
   return (
-    <Section title="Configuracion recomendada" icon={<IconSliders className="h-4 w-4" />} accent>
+    <Section title="config.recommended" icon={<IconSliders className="h-4 w-4" />} accent>
       {recommendation.source === 'local' && (
-        <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+        <div className="mb-4 flex items-start gap-3 rounded-none border border-amber-500/30 bg-black p-4 text-sm text-amber-200">
           <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <span>La IA integrada no respondio o alcanzo su limite. Esta es una recomendacion local de respaldo generada por OBSREC.</span>
         </div>
       )}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800/70 bg-zinc-950/60 p-3 text-xs text-zinc-400">
-        <span className="font-semibold uppercase tracking-wider text-indigo-300">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-none border border-border bg-white/[0.02] p-3 text-xs text-text-muted">
+        <span className="font-semibold uppercase tracking-wider text-primary">
           {getSourceLabel(recommendation.source)}
         </span>
         <span>Privacidad: solo se envia informacion tecnica del equipo, modo y plataforma; no se envian archivos ni claves de OBS.</span>
@@ -371,13 +371,13 @@ export function Recommendations() {
           </div>
         </Field>
       </div>
-      <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/[0.06] p-4">
+      <div className="rounded-none border border-primary/30 bg-primary/[0.06] p-4">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="block text-xs font-semibold uppercase tracking-wider text-indigo-300">
+          <span className="block text-xs font-semibold uppercase tracking-wider text-primary">
             Por que esta configuracion?
           </span>
           {hasUserChanges && (
-            <span className="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-400/10 px-2.5 py-1 text-xs font-medium text-indigo-200">
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
               {isExplaining && <Spinner className="h-3 w-3" />}
               {isExplaining
                 ? 'IA recalculando'
@@ -387,7 +387,7 @@ export function Recommendations() {
             </span>
           )}
         </div>
-        <p className="text-sm leading-relaxed text-zinc-300">{reasoning}</p>
+        <p className="text-sm leading-relaxed text-text">{reasoning}</p>
       </div>
     </Section>
   );

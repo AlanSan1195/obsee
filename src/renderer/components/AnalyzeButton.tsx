@@ -30,23 +30,24 @@ export function AnalyzeButton() {
       type="button"
       onClick={handleAnalyze}
       disabled={isDisabled}
-      className={`flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-4 text-base font-semibold transition-all duration-200 ${
+      className={`group flex w-full items-center justify-center gap-3 rounded-none px-6 py-4 text-base font-bold lowercase tracking-terminal transition-all duration-200 ${
         isDisabled
-          ? 'cursor-not-allowed border border-zinc-800 bg-zinc-900/60 text-zinc-500'
-          : 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-400 hover:to-violet-400 hover:shadow-indigo-500/40 active:scale-[0.99]'
+          ? 'cursor-not-allowed border border-border bg-white/[0.03] text-text-muted'
+          : 'bg-primary text-background shadow-[0_0_26px_-8px_rgba(94,255,159,0.6)] hover:bg-primary-hover hover:shadow-[0_0_32px_-6px_rgba(94,255,159,0.75)] active:scale-[0.99]'
       }`}
     >
       {isAnalyzing ? (
-        <Spinner className="h-5 w-5 border-white/80 border-t-transparent" />
+        <Spinner className="h-5 w-5 border-background/80 border-t-transparent" />
       ) : (
         <IconSparkles className="h-5 w-5" />
       )}
       <span>
+        <span className="opacity-60">{isDisabled ? '$ ' : './'}</span>
         {isAnalyzing
-          ? 'Analizando tu sistema...'
+          ? 'analizando sistema...'
           : !mode || !platform
-            ? 'Selecciona modo y plataforma primero'
-            : 'Buscar la mejor configuracion'}
+            ? 'selecciona modo y plataforma'
+            : 'analyze --recommend'}
       </span>
     </button>
   );

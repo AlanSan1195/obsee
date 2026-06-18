@@ -146,7 +146,7 @@ export function OBSComparison() {
 
   return (
     <Section
-      title="Diagnostico de OBS"
+      title="obs.diff"
       icon={<IconActivity className="h-4 w-4" />}
       action={
         <>
@@ -154,7 +154,7 @@ export function OBSComparison() {
             <button
               type="button"
               onClick={() => setRestoreDialogOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition-colors hover:border-zinc-600 hover:bg-zinc-800"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-text transition-colors hover:border-primary/40 hover:bg-white/[0.04]"
             >
               <IconRefresh className="h-3.5 w-3.5" />
               Restaurar configuracion anterior
@@ -163,8 +163,8 @@ export function OBSComparison() {
           <span
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
               changeCount === 0
-                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-                : 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300'
+                ? 'border-primary/40 bg-primary/10 text-primary'
+                : 'border-primary/40 bg-primary/10 text-primary'
             }`}
           >
             {changeCount} cambio{changeCount === 1 ? '' : 's'}
@@ -172,8 +172,8 @@ export function OBSComparison() {
         </>
       }
     >
-      <div className="overflow-hidden rounded-xl border border-zinc-800/80">
-        <div className="grid grid-cols-[1fr_1fr_1fr_104px] bg-zinc-950/80 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+      <div className="overflow-hidden rounded-none border border-border">
+        <div className="grid grid-cols-[1fr_1fr_1fr_104px] bg-background/80 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted">
           <span>Ajuste</span>
           <span>OBS actual</span>
           <span>Recomendado</span>
@@ -184,19 +184,19 @@ export function OBSComparison() {
           return (
             <div
               key={row.label}
-              className="grid grid-cols-[1fr_1fr_1fr_104px] items-center border-t border-zinc-800/60 px-4 py-3 text-sm transition-colors hover:bg-zinc-800/30"
+              className="grid grid-cols-[1fr_1fr_1fr_104px] items-center border-t border-border px-4 py-3 text-sm transition-colors hover:bg-primary/[0.04]"
             >
-              <span className="font-medium text-zinc-300">{row.label}</span>
-              <span className="text-zinc-500">{row.current || 'Desconocido'}</span>
-              <span className="text-zinc-100">{row.recommended}</span>
+              <span className="font-medium text-text">{row.label}</span>
+              <span className="text-text-muted">{row.current || 'Desconocido'}</span>
+              <span className="text-text">{row.recommended}</span>
               <span>
                 {same ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                     <IconCheck className="h-3 w-3" />
                     Mantener
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-300">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-black px-2.5 py-0.5 text-xs font-semibold text-amber-200">
                     Cambiar
                   </span>
                 )}

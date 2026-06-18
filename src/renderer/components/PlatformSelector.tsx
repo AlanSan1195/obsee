@@ -5,17 +5,17 @@ import { IconTwitch, IconYoutube, Section } from './ui';
 const platforms = [
   {
     id: 'twitch',
-    label: 'Twitch',
+    label: 'twitch',
     icon: IconTwitch,
-    selectedClasses: 'border-purple-500/60 bg-purple-500/10 text-purple-300 shadow-[0_0_30px_-10px_rgba(168,85,247,0.5)]',
-    selectedIconClasses: 'border-purple-500/50 bg-purple-500/15 text-purple-300',
+    selectedClasses: 'border-primary/60 bg-primary/10 text-primary shadow-[0_0_28px_-10px_rgba(94,255,159,0.6)]',
+    selectedIconClasses: 'border-primary/50 bg-primary/15 text-primary',
   },
   {
     id: 'youtube',
-    label: 'YouTube',
+    label: 'youtube',
     icon: IconYoutube,
-    selectedClasses: 'border-red-500/60 bg-red-500/10 text-red-300 shadow-[0_0_30px_-10px_rgba(239,68,68,0.5)]',
-    selectedIconClasses: 'border-red-500/50 bg-red-500/15 text-red-300',
+    selectedClasses: 'border-primary/60 bg-primary/10 text-primary shadow-[0_0_28px_-10px_rgba(94,255,159,0.6)]',
+    selectedIconClasses: 'border-primary/50 bg-primary/15 text-primary',
   },
 ] as const;
 
@@ -23,7 +23,7 @@ export function PlatformSelector() {
   const { platform, setPlatform } = useAppStore();
 
   return (
-    <Section title="2 · Selecciona plataforma">
+    <Section title="target.select" icon={<span className="text-xs">[2]</span>}>
       <div className="grid grid-cols-2 gap-3">
         {platforms.map((p) => {
           const selected = platform === p.id;
@@ -34,22 +34,22 @@ export function PlatformSelector() {
               key={p.id}
               onClick={() => setPlatform(p.id)}
               aria-pressed={selected}
-              className={`group flex flex-col items-center gap-3 rounded-xl border p-5 transition-all duration-200 ${
+              className={`group flex flex-col items-center gap-3 rounded-none border p-5 backdrop-blur-md transition-all duration-200 ${
                 selected
                   ? p.selectedClasses
-                  : 'border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:-translate-y-0.5 hover:border-zinc-700 hover:bg-zinc-800/80 hover:text-zinc-200'
+                  : 'border-border bg-white/[0.03] text-text-muted hover:-translate-y-0.5 hover:border-primary/30 hover:bg-surface-hover hover:text-text'
               }`}
             >
               <span
-                className={`flex h-11 w-11 items-center justify-center rounded-xl border transition-colors ${
+                className={`flex h-11 w-11 items-center justify-center rounded-none border transition-colors ${
                   selected
                     ? p.selectedIconClasses
-                    : 'border-zinc-700/80 bg-zinc-800/80 text-zinc-400 group-hover:text-zinc-200'
+                    : 'border-border bg-white/5 text-text-muted group-hover:text-text'
                 }`}
               >
                 <Icon className="h-5 w-5" />
               </span>
-              <span className="text-sm font-semibold">{p.label}</span>
+              <span className="text-sm font-medium lowercase tracking-terminal">{p.label}</span>
             </button>
           );
         })}

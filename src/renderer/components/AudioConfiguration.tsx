@@ -14,7 +14,7 @@ const defaultFilters = {
 };
 
 const secondaryButtonClasses =
-  'inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-300 transition-colors hover:border-zinc-600 hover:bg-zinc-800';
+  'inline-flex items-center gap-1.5 rounded-none border border-border px-3 py-2 text-xs font-semibold text-text transition-colors hover:border-primary/40 hover:bg-white/[0.04]';
 
 function getSelectedDevice(devices: OBSAudioDevice[], selectedDeviceId?: string): OBSAudioDevice | undefined {
   return devices.find((device) => device.id === selectedDeviceId);
@@ -145,7 +145,7 @@ export function AudioConfiguration() {
   if (!obsAudioSnapshot) {
     return (
       <Section
-        title="Configuracion de audio"
+        title="audio.voice"
         icon={<IconMic className="h-4 w-4" />}
         action={
           <button type="button" onClick={handleRefresh} className={secondaryButtonClasses}>
@@ -154,8 +154,8 @@ export function AudioConfiguration() {
           </button>
         }
       >
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/70 p-4">
-          <p className="text-sm text-zinc-300">
+        <div className="rounded-none border border-border bg-white/[0.02] p-4">
+          <p className="text-sm text-text">
             {obsConnected
               ? 'OBSREC esta buscando un dispositivo Mic/Aux o una fuente Audio Input Capture para aplicar la configuracion de voz.'
               : 'Conecta OBS para detectar tu microfono y aplicar la configuracion de voz de OBSREC.'}
@@ -169,7 +169,6 @@ export function AudioConfiguration() {
   }
 
   const filtersReady = obsAudioSnapshot.obsrecFiltersConfigured;
-  const monoReady = obsAudioSnapshot.monoConfigured;
   const monoSupported = obsAudioSnapshot.monoSupported;
   const fps = obsSettingsSnapshot?.fps ?? 60;
   const syncFrames = [1, 2, 3, 4, 5, 6];
@@ -183,13 +182,9 @@ export function AudioConfiguration() {
 
   return (
     <Section
-      title="Configuracion de audio"
+      title="audio.voice"
       icon={<IconMic className="h-4 w-4" />}
-      subtitle={
-        <>
-          Objetivo: <span className="text-zinc-300">{obsAudioSnapshot.inputName}</span>
-        </>
-      }
+      subtitle="Objetivo: que tu voz se escuche clara, fuerte y sin ruido de fondo al grabar o transmitir."
       action={
         <>
           <button type="button" onClick={handleLocalDeviceScan} className={secondaryButtonClasses}>
@@ -204,54 +199,61 @@ export function AudioConfiguration() {
       }
     >
       <div className="mb-4 grid gap-4 md:grid-cols-[1.4fr_1fr]">
-        <label className="block rounded-xl border border-zinc-800/60 bg-zinc-950/70 p-4 transition-colors focus-within:border-indigo-500/50">
-          <span className="mb-2 block text-xs uppercase tracking-wider text-zinc-500">Microfono recomendado</span>
+        <label className="block rounded-none border border-border bg-white/[0.02] p-4 transition-colors focus-within:border-primary/50">
+          <span className="mb-2 block text-xs uppercase tracking-wider text-text-muted">Microfono recomendado</span>
           <select
             value={selectedDeviceId}
             onChange={(event) => setSelectedDeviceId(event.target.value)}
-            className="app-select w-full bg-transparent text-base font-medium text-white outline-none"
+            className="app-select w-full bg-transparent text-base font-medium text-text outline-none"
           >
             {obsAudioSnapshot.devices.length === 0 ? (
-              <option value="" className="bg-zinc-950 text-white">Dispositivo actual de OBS</option>
+              <option value="" className="bg-background text-text">Dispositivo actual de OBS</option>
             ) : (
               obsAudioSnapshot.devices.map((device) => (
-                <option key={`${device.id}-${device.name}`} value={device.id} className="bg-zinc-950 text-white">
+                <option key={`${device.id}-${device.name}`} value={device.id} className="bg-background text-text">
                   {device.isRecommended ? 'Recomendado - ' : ''}{device.name}
                 </option>
               ))
             )}
           </select>
-          <span className="mt-2 block text-xs text-zinc-600">
+          <span className="mt-2 block text-xs text-text-faint">
             {selectedDevice?.reason ?? 'OBS no expuso una lista de dispositivos para esta entrada.'}
           </span>
         </label>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/70 p-4">
-            <span className="mb-2 block text-xs uppercase tracking-wider text-zinc-500">Mono</span>
-            <span className={monoReady ? 'text-base font-semibold text-emerald-400' : monoSupported ? 'text-base font-semibold text-amber-400' : 'text-base font-semibold text-zinc-400'}>
-              {monoReady ? 'Listo' : monoSupported ? 'Se puede aplicar' : 'Manual en OBS'}
-            </span>
-          </div>
-          <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/70 p-4">
-            <span className="mb-2 block text-xs uppercase tracking-wider text-zinc-500">Filtros</span>
-            <span className={filtersReady ? 'text-base font-semibold text-emerald-400' : 'text-base font-semibold text-amber-400'}>
-              {filtersReady ? 'Listos' : 'Se aplicaran'}
-            </span>
-          </div>
+        <div className="rounded-none border border-border bg-white/[0.02] p-4">
+          <span className="mb-2 block text-xs uppercase tracking-wider text-text-muted">Filtros</span>
+          <span className={filtersReady ? 'text-base font-semibold text-primary' : 'text-base font-semibold text-amber-400'}>
+            {filtersReady ? 'Listos' : 'Se aplicaran'}
+          </span>
         </div>
       </div>
 
       <div className="mb-4 grid gap-3 text-sm md:grid-cols-3">
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/70 px-4 py-3 text-zinc-300">OBSREC - Ganancia +10 dB</div>
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/70 px-4 py-3 text-zinc-300">OBSREC - Compresor 4:1 a -10 dB</div>
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/70 px-4 py-3 text-zinc-300">OBSREC - Limitador a -1 dB</div>
+        <div className="rounded-none border border-border bg-white/[0.02] px-4 py-3">
+          <span className="block font-semibold text-text">Ganancia +10 dB</span>
+          <span className="mt-1 block text-xs leading-relaxed text-text-muted">
+            Sube el volumen de tu microfono para que tu voz se escuche fuerte y clara sin tener que acercarte ni gritar.
+          </span>
+        </div>
+        <div className="rounded-none border border-border bg-white/[0.02] px-4 py-3">
+          <span className="block font-semibold text-text">Compresor 4:1 a -10 dB</span>
+          <span className="mt-1 block text-xs leading-relaxed text-text-muted">
+            Empareja tu voz: suaviza los picos cuando hablas fuerte y realza las partes bajas, para un volumen constante y profesional.
+          </span>
+        </div>
+        <div className="rounded-none border border-border bg-white/[0.02] px-4 py-3">
+          <span className="block font-semibold text-text">Limitador a -1 dB</span>
+          <span className="mt-1 block text-xs leading-relaxed text-text-muted">
+            Pone un tope de seguridad: evita que un grito o un golpe de sonido sature y se escuche distorsionado en la grabacion.
+          </span>
+        </div>
       </div>
 
-      <div className="mb-4 rounded-xl border border-zinc-800/60 bg-zinc-950/70 p-4">
-        <h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-500">Etapa 2</h4>
+      <div className="mb-4 rounded-none border border-border bg-white/[0.02] p-4">
+        <h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-text-muted">Etapa 2</h4>
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="flex items-start gap-3 rounded-xl border border-zinc-800 p-3 transition-colors hover:border-zinc-700">
+          <label className="flex items-start gap-3 rounded-none border border-border p-3 transition-colors hover:border-border">
             <input
               type="checkbox"
               checked={noiseSuppression}
@@ -259,30 +261,30 @@ export function AudioConfiguration() {
               className="mt-1"
             />
             <span>
-              <span className="block text-sm font-semibold text-zinc-200">Supresion de ruido</span>
-              <span className="block text-xs text-zinc-500">Filtro RNNoise para limpiar estatica y ruido de fondo.</span>
+              <span className="block text-sm font-semibold text-text">Supresion de ruido</span>
+              <span className="block text-xs text-text-muted">Filtro RNNoise para limpiar estatica y ruido de fondo.</span>
             </span>
           </label>
 
-          <label className="block rounded-xl border border-zinc-800 p-3 transition-colors focus-within:border-indigo-500/50">
-            <span className="mb-2 block text-sm font-semibold text-zinc-200">Monitoreo</span>
+          <label className="block rounded-none border border-border p-3 transition-colors focus-within:border-primary/50">
+            <span className="mb-2 block text-sm font-semibold text-text">Monitoreo</span>
             <select
               value={monitorType}
               onChange={(event) => setMonitorType(event.target.value as OBSAudioConfig['monitorType'])}
-              className="app-select w-full bg-transparent text-sm text-white outline-none"
+              className="app-select w-full bg-transparent text-sm text-text outline-none"
             >
-              <option value="OBS_MONITORING_TYPE_NONE" className="bg-zinc-950 text-white">Sin monitoreo</option>
-              <option value="OBS_MONITORING_TYPE_MONITOR_ONLY" className="bg-zinc-950 text-white">Solo monitoreo</option>
-              <option value="OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" className="bg-zinc-950 text-white">Monitorizar y emitir</option>
+              <option value="OBS_MONITORING_TYPE_NONE" className="bg-background text-text">Sin monitoreo</option>
+              <option value="OBS_MONITORING_TYPE_MONITOR_ONLY" className="bg-background text-text">Solo monitoreo</option>
+              <option value="OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" className="bg-background text-text">Monitorizar y emitir</option>
             </select>
-            <span className="mt-2 block text-xs text-zinc-500">
+            <span className="mt-2 block text-xs text-text-muted">
               Usa audifonos conectados a la salida de monitoreo de OBS para escuchar exactamente lo que se transmite y evitar eco.
             </span>
           </label>
 
-          <div className="rounded-xl border border-zinc-800 p-3 transition-colors focus-within:border-indigo-500/50">
+          <div className="rounded-none border border-border p-3 transition-colors focus-within:border-primary/50">
             <label className="block">
-              <span className="mb-2 block text-sm font-semibold text-zinc-200">Sincronizacion (lip sync)</span>
+              <span className="mb-2 block text-sm font-semibold text-text">Sincronizacion (lip sync)</span>
               <input
                 type="number"
                 min={-950}
@@ -290,31 +292,31 @@ export function AudioConfiguration() {
                 step={5}
                 value={syncOffsetMs}
                 onChange={(event) => setSyncOffsetMs(Number(event.target.value))}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none transition-colors focus:border-indigo-500"
+                className="w-full rounded-none border border-border bg-background px-3 py-2 text-sm text-text outline-none transition-colors focus:border-primary"
               />
             </label>
             <div className="mt-3 flex items-center gap-2">
-              <span className="text-xs text-zinc-500">Cuadros</span>
+              <span className="text-xs text-text-muted">Cuadros</span>
               <select
                 value=""
                 onChange={(event) => {
                   const frames = Number(event.target.value);
                   if (frames > 0) setSyncOffsetMs(Math.round(frames * 1000 / fps));
                 }}
-                className="app-select rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs text-zinc-100 outline-none"
+                className="app-select rounded-none border border-border bg-background px-2 py-1 text-xs text-text outline-none"
               >
-                <option value="" className="bg-zinc-950 text-white">Elegir</option>
+                <option value="" className="bg-background text-text">Elegir</option>
                 {syncFrames.map((frames) => (
-                  <option key={frames} value={frames} className="bg-zinc-950 text-white">{frames}</option>
+                  <option key={frames} value={frames} className="bg-background text-text">{frames}</option>
                 ))}
               </select>
             </div>
-            <span className="mt-2 block text-xs text-zinc-500">
+            <span className="mt-2 block text-xs text-text-muted">
               cuadros de desfase x (1000 / FPS) = ms; ej. 3 cuadros a 60 fps = 50 ms.
             </span>
           </div>
 
-          <div className={`rounded-xl border border-zinc-800 p-3 ${obsAudioSnapshot.duckingTargets.length > 0 ? '' : 'opacity-60'}`}>
+          <div className={`rounded-none border border-border p-3 ${obsAudioSnapshot.duckingTargets.length > 0 ? '' : 'opacity-60'}`}>
             <label className="flex items-start gap-3">
               <input
                 type="checkbox"
@@ -324,8 +326,8 @@ export function AudioConfiguration() {
                 className="mt-1"
               />
               <span>
-                <span className="block text-sm font-semibold text-zinc-200">Bajar la musica al hablar (ducking)</span>
-                <span className="block text-xs text-zinc-500">
+                <span className="block text-sm font-semibold text-text">Bajar la musica al hablar (ducking)</span>
+                <span className="block text-xs text-text-muted">
                   {obsAudioSnapshot.duckingTargets.length > 0
                     ? `Aplica un compresor a ${selectedDuckingTarget || obsAudioSnapshot.duckingTargets[0].inputName} que reduce su volumen cuando el microfono detecta voz.`
                     : 'OBSREC no encontro una fuente de musica o audio de escritorio. Agrega una fuente multimedia, VLC o audio de escritorio y pulsa Actualizar OBS.'}
@@ -334,19 +336,19 @@ export function AudioConfiguration() {
             </label>
             {obsAudioSnapshot.duckingTargets.length > 0 && (
               <label className="mt-3 block">
-                <span className="mb-2 block text-xs text-zinc-500">Fuente para ducking</span>
+                <span className="mb-2 block text-xs text-text-muted">Fuente para ducking</span>
                 <select
                   value={selectedDuckingTarget}
                   onChange={(event) => setSelectedDuckingTarget(event.target.value)}
-                  className="app-select w-full bg-transparent text-sm text-white outline-none"
+                  className="app-select w-full bg-transparent text-sm text-text outline-none"
                 >
                   {obsAudioSnapshot.duckingTargets.map((target) => (
-                    <option key={`${target.inputKind}-${target.inputName}`} value={target.inputName} className="bg-zinc-950 text-white">
+                    <option key={`${target.inputKind}-${target.inputName}`} value={target.inputName} className="bg-background text-text">
                       {target.inputName}{target.duckingConfigured ? ' (configurado)' : ''}
                     </option>
                   ))}
                 </select>
-                <span className="mt-2 block text-xs text-zinc-600">
+                <span className="mt-2 block text-xs text-text-faint">
                   Tipo OBS: {selectedDuckingTargetInfo?.inputKind ?? 'desconocido'}
                 </span>
               </label>
@@ -356,7 +358,7 @@ export function AudioConfiguration() {
       </div>
 
       {(obsAudioSnapshot.warnings.length > 0 || localDeviceStatus) && (
-        <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+        <div className="mb-4 flex items-start gap-3 rounded-none border border-amber-500/30 bg-black p-4 text-sm text-amber-200">
           <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <p>{[localDeviceStatus, ...obsAudioSnapshot.warnings].filter(Boolean).join(' ')}</p>
@@ -373,21 +375,21 @@ export function AudioConfiguration() {
         type="button"
         onClick={() => setConfirmOpen(true)}
         disabled={isApplying}
-        className={`flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-4 text-base font-semibold transition-all duration-200 ${
+        className={`group flex w-full items-center justify-center gap-3 rounded-none px-6 py-4 text-base font-bold lowercase tracking-terminal transition-all duration-200 ${
           isApplying
-            ? 'cursor-not-allowed border border-zinc-800 bg-zinc-900/60 text-zinc-500'
-            : 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-400 hover:to-violet-400 hover:shadow-indigo-500/40 active:scale-[0.99]'
+            ? 'cursor-not-allowed border border-border bg-white/[0.03] text-text-muted'
+            : 'bg-primary text-background shadow-[0_0_26px_-8px_rgba(94,255,159,0.6)] hover:bg-primary-hover hover:shadow-[0_0_32px_-6px_rgba(94,255,159,0.75)] active:scale-[0.99]'
         }`}
       >
         {isApplying ? (
           <>
-            <Spinner className="h-5 w-5 border-white/80 border-t-transparent" />
-            <span>Aplicando audio...</span>
+            <Spinner className="h-5 w-5 border-background/80 border-t-transparent" />
+            <span>aplicando audio...</span>
           </>
         ) : (
           <>
             <IconMic className="h-5 w-5" />
-            <span>Aplicar configuracion de voz OBSREC</span>
+            <span><span className="opacity-60">./</span>apply --voice obsrec</span>
           </>
         )}
       </button>

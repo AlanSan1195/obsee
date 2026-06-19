@@ -5,28 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="OBSREC analiza tu PC, recomienda ajustes para OBS y explica que cambiar antes de aplicarlo."
+      content="obsee analiza tu PC, recomienda ajustes para OBS y explica que cambiar antes de aplicarlo."
     />
-    <title>OBSREC | Configuracion inteligente para OBS</title>
+    <meta name="theme-color" content="#050505" />
+    <title>obsee· aplica configuracion a OBS con IA</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Doto:wght@500;700;900&display=swap"
+      rel="stylesheet"
+    />
+
     <style>
       :root {
         color-scheme: dark;
-        --bg: #08090d48;
-        --panel: rgba(17, 19, 27, 0.9);
-        --panel-strong: #11131b;
-        --line: rgba(255, 255, 255, 0.12);
-        --text: #f7f7fb;
-        --muted: #b7bccb;
-        --soft: #7f879a;
-        --brand: #ff4d45;
-        --brand-dark: #d9362f;
-        --teal: #40d9c4;
-        --blue: #7aa8ff;
-        --warning: #ffd166;
-        --shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+        --bg: #050505; 
+        --phosphor: #5eff9f;
+        --phosphor-dim: #3ad27f;
+        --phosphor-hover: #7dffb4;
+        --border: rgba(94, 255, 159, 0.16);
+        --border-strong: rgba(94, 255, 159, 0.45);
+        --surface: rgba(8, 12, 9, 0.55);
+        --text: #d7f7e2;
+        --muted: #5f8b6f;
+        --faint: #3a5544;
+        --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --display: "Doto", "JetBrains Mono", ui-monospace, monospace;
       }
 
       * {
+        margin: 0;
+        padding: 0;
         box-sizing: border-box;
       }
 
@@ -35,14 +45,16 @@
       }
 
       body {
-        margin: 0;
         min-width: 320px;
         background: var(--bg);
         color: var(--text);
-        font-family:
-          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        line-height: 1.5;
+        font-family: var(--mono);
+        font-size: 15px;
+        line-height: 1.6;
+        letter-spacing: 0.01em;
         -webkit-font-smoothing: antialiased;
+        font-feature-settings: "liga" 0, "calt" 0;
+        overflow-x: hidden;
       }
 
       a {
@@ -50,704 +62,868 @@
         text-decoration: none;
       }
 
+      ::selection {
+        background: rgba(94, 255, 159, 0.28);
+        color: #eafff1;
+      }
+
+      :focus-visible {
+        outline: 1px solid rgba(94, 255, 159, 0.8);
+        outline-offset: 2px;
+      }
+
+      /* ---- CRT / terminal backdrop ---- */
+      .backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        overflow: hidden;
+        pointer-events: none;
+        background:
+          radial-gradient(1100px 620px at 50% -240px, rgba(94, 255, 159, 0.06), transparent 70%),
+          linear-gradient(rgba(94, 255, 159, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(94, 255, 159, 0.035) 1px, transparent 1px),
+          #050505;
+        background-size: 100% 100%, 44px 44px, 44px 44px, 100% 100%;
+      }
+
+      .backdrop::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: repeating-linear-gradient(
+          to bottom,
+          rgba(0, 0, 0, 0) 0,
+          rgba(0, 0, 0, 0) 2px,
+          rgba(0, 0, 0, 0.18) 3px
+        );
+        opacity: 0.5;
+      }
+
+      .scanbeam {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 220px;
+        background: linear-gradient(to bottom, transparent, rgba(94, 255, 159, 0.05), transparent);
+        animation: scan 7s linear infinite;
+      }
+
+      @keyframes scan {
+        0% { transform: translateY(-260px); }
+        100% { transform: translateY(110vh); }
+      }
+
       .shell {
-        width: min(1120px, calc(100% - 40px));
+        width: min(1080px, calc(100% - 40px));
         margin: 0 auto;
       }
 
+      /* ---- top bar ---- */
       .topbar {
         position: fixed;
         inset: 0 0 auto;
-        z-index: 20;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(8, 9, 13, 0.78);
-        backdrop-filter: blur(18px);
+        z-index: 30;
+        border-bottom: 1px solid var(--border);
+        background: rgba(5, 5, 5, 0.82);
+        backdrop-filter: blur(12px);
       }
 
       .nav {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        min-height: 72px;
+        min-height: 56px;
         gap: 18px;
+        font-size: 0.82rem;
       }
 
       .brand {
         display: inline-flex;
-        align-items: center;
-        gap: 12px;
-        font-weight: 800;
+        align-items: baseline;
+        gap: 1px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
       }
 
-      .brand-mark {
-        display: grid;
-        width: 36px;
-        height: 36px;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 4px;
-        padding: 7px;
-        border-radius: 10px;
-        background: var(--brand);
-        box-shadow: 0 12px 34px rgba(255, 77, 69, 0.28);
+      .brand b {
+        color: var(--phosphor);
+        text-shadow: 0 0 12px rgba(94, 255, 159, 0.45);
       }
 
-      .brand-mark span {
-        border-radius: 3px;
-        background: white;
+      .brand .cpu-cursor {
+        margin-left: 2px;
+        width: 0.9em;
+        height: 0.9em;
       }
 
       .nav-links {
         display: flex;
         align-items: center;
-        gap: 20px;
+        gap: 18px;
         color: var(--muted);
-        font-size: 0.94rem;
+      }
+
+      .nav-links a {
+        position: relative;
+        transition: color 0.15s ease;
+      }
+
+      .nav-links a::before {
+        content: "/";
+        color: var(--faint);
+        margin-right: 1px;
       }
 
       .nav-links a:hover {
-        color: var(--text);
+        color: var(--phosphor);
       }
 
-      .hero {
-        position: relative;
-        min-height: 88svh;
-        padding: 132px 0 76px;
-        overflow: hidden;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        background:
-          linear-gradient(180deg, rgba(8, 9, 13, 0.16), #08090d 96%),
-          linear-gradient(120deg, rgba(255, 77, 69, 0.22), transparent 38%),
-          linear-gradient(250deg, rgba(64, 217, 196, 0.18), transparent 44%),
-          #08090d;
-      }
-
-      .product-scene {
-        position: absolute;
-        inset: 92px max(-120px, -8vw) auto auto;
-        width: min(760px, 66vw);
-        min-width: 520px;
-        transform: rotate(-3deg);
-        opacity: 0.78;
-        pointer-events: none;
-      }
-
-      .window {
-        overflow: hidden;
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        border-radius: 18px;
-        background: rgba(12, 14, 20, 0.92);
-        box-shadow: var(--shadow);
-      }
-
-      .window-bar {
-        display: flex;
+      .nav-status {
+        display: inline-flex;
         align-items: center;
         gap: 8px;
-        height: 42px;
-        padding: 0 16px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+      }
+
+      .cpu-cursor {
+        display: inline-block;
+        width: 0.85em;
+        height: 0.85em;
+        margin-left: 4px;
+        color: var(--phosphor);
+        vertical-align: text-bottom;
+        filter: drop-shadow(0 0 6px rgba(94, 255, 159, 0.7));
+      }
+
+      @keyframes blink {
+        0%, 49% { opacity: 1; }
+        50%, 100% { opacity: 0; }
       }
 
       .dot {
-        width: 10px;
-        height: 10px;
+        width: 7px;
+        height: 7px;
         border-radius: 999px;
-        background: var(--brand);
+        background: var(--phosphor);
+        box-shadow: 0 0 8px rgba(94, 255, 159, 0.8);
+        animation: pulse 1.8s ease-in-out infinite;
       }
 
-      .dot:nth-child(2) {
-        background: var(--warning);
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.82); }
       }
 
-      .dot:nth-child(3) {
-        background: var(--teal);
-      }
-
-      .dashboard {
-        display: grid;
-        grid-template-columns: 1fr 0.86fr;
-        gap: 16px;
-        padding: 22px;
-      }
-
-      .mock-card {
-        min-height: 120px;
-        padding: 18px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.045);
-      }
-
-      .mock-card.wide {
-        grid-column: 1 / -1;
-      }
-
-      .mock-title {
-        width: 44%;
-        height: 14px;
-        margin-bottom: 18px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.22);
-      }
-
-      .mock-line {
-        height: 10px;
-        margin: 12px 0;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.12);
-      }
-
-      .mock-line.short {
-        width: 62%;
-      }
-
-      .meter {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 12px;
-        margin-top: 14px;
-      }
-
-      .meter span {
-        height: 46px;
-        border-radius: 8px;
-        background: linear-gradient(135deg, rgba(64, 217, 196, 0.22), rgba(122, 168, 255, 0.16));
-      }
-
-      .hero-content {
+      /* ---- panel (terminal frame) ---- */
+      .panel {
         position: relative;
-        z-index: 2;
-        width: min(720px, 100%);
+        border: 1px solid var(--border);
+        background: var(--surface);
+        backdrop-filter: blur(2px);
       }
 
-      .eyebrow {
-        display: inline-flex;
+      .panel::before,
+      .panel::after {
+        content: "";
+        position: absolute;
+        width: 9px;
+        height: 9px;
+        border-color: var(--border-strong);
+        border-style: solid;
+        pointer-events: none;
+      }
+
+      .panel::before {
+        top: -1px;
+        left: -1px;
+        border-width: 1px 0 0 1px;
+      }
+
+      .panel::after {
+        bottom: -1px;
+        right: -1px;
+        border-width: 0 1px 1px 0;
+      }
+
+      .panel-head {
+        display: flex;
         align-items: center;
         gap: 10px;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(94, 255, 159, 0.03);
+        font-size: 0.78rem;
+      }
+
+      .panel-head .tick {
+        width: 9px;
+        height: 9px;
+        background: var(--phosphor);
+        box-shadow: 0 0 8px rgba(94, 255, 159, 0.7);
+      }
+
+      .panel-head h3 {
+        font-size: 0.82rem;
+        font-weight: 500;
+        text-transform: lowercase;
+        letter-spacing: 0.08em;
+        color: var(--phosphor);
+        text-shadow: 0 0 10px rgba(94, 255, 159, 0.35);
+      }
+
+      .panel-head .meta {
+        margin-left: auto;
+        font-size: 0.66rem;
+        text-transform: lowercase;
+        letter-spacing: 0.08em;
+        color: var(--faint);
+      }
+
+      .panel-body {
+        padding: 22px 20px;
+      }
+
+      /* ---- hero ---- */
+      .hero {
+        position: relative;
+        padding: 130px 0 70px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 34px;
+        align-items: center;
+      }
+
+      .prompt-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         margin-bottom: 22px;
-        color: var(--teal);
-        font-size: 0.88rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
+        font-size: 0.8rem;
+        color: var(--muted);
+        text-transform: lowercase;
+        letter-spacing: 0.06em;
       }
 
-      .status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: var(--teal);
-        box-shadow: 0 0 0 6px rgba(64, 217, 196, 0.12);
-      }
-
-      h1,
-      h2,
-      h3,
-      p {
-        margin: 0;
+      .prompt-line .arrow {
+        color: var(--phosphor);
       }
 
       h1 {
-        max-width: 780px;
-        font-size: clamp(3.3rem, 8vw, 7rem);
-        line-height: 0.92;
-        letter-spacing: 0;
+        font-family: var(--display);
+        font-weight: 900;
+        font-size: clamp(3.4rem, 9vw, 4.4rem);
+        line-height: 0.9;
+        letter-spacing: 0.02em;
+        color: var(--text);
+        text-shadow: 0 0 24px rgba(94, 255, 159, 0.25);
+      }
+
+      h1 .accent {
+        color: var(--phosphor);
       }
 
       .hero-copy {
-        max-width: 620px;
-        margin-top: 26px;
+        max-width: 520px;
+        margin-top: 24px;
         color: var(--muted);
-        font-size: clamp(1.05rem, 2vw, 1.28rem);
+        font-size: 0.98rem;
+        line-height: 1.7;
+      }
+
+      .hero-copy b {
+        color: var(--text);
+        font-weight: 500;
       }
 
       .actions {
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
-        margin-top: 34px;
+        margin-top: 30px;
       }
 
       .button {
         display: inline-flex;
-        min-height: 48px;
         align-items: center;
-        justify-content: center;
-        gap: 10px;
-        border: 1px solid transparent;
-        border-radius: 8px;
+        gap: 9px;
+        min-height: 44px;
         padding: 0 18px;
-        font-weight: 800;
-        transition:
-          transform 0.18s ease,
-          border-color 0.18s ease,
-          background 0.18s ease;
+        border: 1px solid var(--border-strong);
+        background: transparent;
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 0.84rem;
+        font-weight: 500;
+        text-transform: lowercase;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
       }
 
       .button:hover {
         transform: translateY(-1px);
       }
 
+      .button .pre {
+        color: var(--phosphor);
+      }
+
       .button.primary {
-        background: var(--brand);
-        color: white;
-        box-shadow: 0 18px 42px rgba(255, 77, 69, 0.28);
+        background: rgba(94, 255, 159, 0.1);
+        border-color: var(--phosphor);
+        color: var(--phosphor);
+        box-shadow: 0 0 24px rgba(94, 255, 159, 0.12);
       }
 
       .button.primary:hover {
-        background: var(--brand-dark);
+        background: rgba(94, 255, 159, 0.18);
+        color: var(--phosphor-hover);
+        box-shadow: 0 0 32px rgba(94, 255, 159, 0.22);
       }
 
-      .button.secondary {
-        border-color: rgba(255, 255, 255, 0.16);
-        background: rgba(255, 255, 255, 0.07);
+      .button.ghost:hover {
+        background: rgba(94, 255, 159, 0.06);
+        color: var(--phosphor);
       }
 
       .note {
         margin-top: 16px;
-        color: var(--soft);
-        font-size: 0.92rem;
+        color: var(--faint);
+        font-size: 0.78rem;
+        text-transform: lowercase;
+        letter-spacing: 0.04em;
       }
 
-      section {
-        padding: 82px 0;
+      /* ---- hero mock terminal ---- */
+      .term-mock {
+        font-size: 0.78rem;
+        line-height: 1.85;
+      }
+
+      .term-mock .row {
+        display: flex;
+        gap: 10px;
+        white-space: nowrap;
+      }
+
+      .term-mock .c {
+        color: var(--phosphor);
+      }
+      .term-mock .k {
+        color: var(--muted);
+      }
+      .term-mock .v {
+        color: var(--text);
+        margin-left: auto;
+      }
+      .term-mock .ok {
+        color: var(--phosphor);
+      }
+      .term-mock .sep {
+        height: 1px;
+        background: var(--border);
+        margin: 10px 0;
+      }
+      .term-mock .bar {
+        position: relative;
+        height: 8px;
+        margin-top: 4px;
+        background: rgba(94, 255, 159, 0.08);
+        overflow: hidden;
+      }
+      .term-mock .bar > i {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: var(--phosphor);
+        box-shadow: 0 0 10px rgba(94, 255, 159, 0.6);
+      }
+
+      /* ---- sections ---- */
+      section.block {
+        padding: 70px 0;
       }
 
       .section-head {
+        margin-bottom: 30px;
+      }
+
+      .section-index {
         display: flex;
-        align-items: end;
-        justify-content: space-between;
-        gap: 24px;
-        margin-bottom: 32px;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.74rem;
+        text-transform: lowercase;
+        letter-spacing: 0.08em;
+        color: var(--phosphor);
+        margin-bottom: 14px;
+      }
+
+      .section-index .num {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .section-index .src {
+        margin-left: auto;
+        color: var(--faint);
       }
 
       .section-head h2 {
-        max-width: 640px;
-        font-size: clamp(2rem, 4vw, 3rem);
-        line-height: 1;
-        letter-spacing: 0;
+        font-size: clamp(1.7rem, 3.6vw, 2.5rem);
+        line-height: 1.1;
+        letter-spacing: 0.01em;
+        font-weight: 700;
+        color: var(--text);
       }
 
       .section-head p {
-        max-width: 420px;
+        max-width: 560px;
+        margin-top: 14px;
         color: var(--muted);
+        font-size: 0.92rem;
       }
 
       .grid {
         display: grid;
-        gap: 16px;
+        gap: 14px;
       }
+      .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-      .grid.three {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+      .card-cmd {
+        font-size: 0.72rem;
+        text-transform: lowercase;
+        letter-spacing: 0.06em;
+        color: var(--phosphor);
+        margin-bottom: 14px;
       }
-
-      .grid.two {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .card {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel);
-        padding: 24px;
-      }
+      .card-cmd .hash { color: var(--text); font-weight: 700; }
 
       .card strong {
         display: block;
-        margin-bottom: 10px;
-        font-size: 1.05rem;
+        margin-bottom: 8px;
+        font-size: 0.98rem;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: 0.01em;
       }
 
       .card p {
         color: var(--muted);
+        font-size: 0.88rem;
       }
 
-      .step {
-        position: relative;
-        min-height: 190px;
-      }
-
-      .step-number {
-        display: grid;
-        width: 38px;
-        height: 38px;
-        margin-bottom: 22px;
+      .card .icon {
+        display: inline-grid;
         place-items: center;
-        border-radius: 999px;
-        background: rgba(64, 217, 196, 0.14);
-        color: var(--teal);
-        font-weight: 900;
+        width: 34px;
+        height: 34px;
+        margin-bottom: 16px;
+        border: 1px solid var(--border);
+        color: var(--phosphor);
       }
+      .card .icon svg { width: 18px; height: 18px; }
 
-      .purpose {
-        background: #0c0f16;
-      }
-
-      .download {
-        background:
-          linear-gradient(180deg, #08090d, rgba(255, 77, 69, 0.08)),
-          #08090d;
-      }
-
-      .download-panel {
+      /* ---- download ---- */
+      .dl-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 16px;
+        gap: 14px;
       }
 
-      .download-card {
-        min-height: 250px;
+      .dl-card .panel-body {
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
-      }
-
-      .platform {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
         gap: 16px;
-        margin-bottom: 18px;
+        min-height: 240px;
       }
 
-      .platform-icon {
-        display: grid;
-        width: 54px;
-        height: 54px;
-        place-items: center;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.08);
-        font-size: 1.7rem;
-        font-weight: 900;
+      .dl-os {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--text);
       }
+      .dl-os .pre { color: var(--phosphor); font-weight: 500; }
 
-      .download-card ul {
-        margin: 18px 0 24px;
-        padding-left: 20px;
+      .dl-card ul {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-size: 0.85rem;
         color: var(--muted);
       }
-
-      .download-card li + li {
-        margin-top: 8px;
+      .dl-card li::before {
+        content: "→ ";
+        color: var(--phosphor);
       }
+      .dl-card .button { margin-top: auto; }
 
-      .privacy-row {
-        display: grid;
-        grid-template-columns: 1.2fr 0.8fr;
-        gap: 16px;
-      }
-
-      .backend-status {
+      /* ---- status pill ---- */
+      .status {
         display: inline-flex;
-        width: fit-content;
         align-items: center;
-        gap: 10px;
-        margin-top: 18px;
+        gap: 9px;
+        margin-top: 16px;
+        font-size: 0.82rem;
         color: var(--muted);
-        font-size: 0.94rem;
+        text-transform: lowercase;
+        letter-spacing: 0.04em;
       }
-
-      .backend-status span {
-        width: 9px;
-        height: 9px;
+      .status .led {
+        width: 8px;
+        height: 8px;
         border-radius: 999px;
-        background: var(--warning);
+        background: #ffd166;
+        box-shadow: 0 0 8px rgba(255, 209, 102, 0.7);
+      }
+      .status.is-ok .led {
+        background: var(--phosphor);
+        box-shadow: 0 0 8px rgba(94, 255, 159, 0.8);
+      }
+      .status.is-local .led {
+        background: #ffd166;
+        box-shadow: 0 0 8px rgba(255, 209, 102, 0.7);
+      }
+      .status.is-down .led {
+        background: #ff6b6b;
+        box-shadow: 0 0 8px rgba(255, 107, 107, 0.7);
       }
 
-      .backend-status.is-ok span {
-        background: var(--teal);
-      }
-
+      /* ---- footer ---- */
       footer {
-        padding: 34px 0;
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
-        color: var(--soft);
+        padding: 40px 0;
+        border-top: 1px solid var(--border);
+        color: var(--faint);
       }
-
-      .footer-inner {
+      .foot {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         gap: 16px;
+        font-size: 0.78rem;
+        text-transform: lowercase;
+        letter-spacing: 0.05em;
       }
+      .foot-links {
+        display: flex;
+        gap: 16px;
+      }
+      .foot-links a:hover { color: var(--phosphor); }
+      .colophon {
+        margin-top: 18px;
+        font-size: 0.7rem;
+        color: var(--faint);
+        line-height: 1.7;
+      }
+      .colophon b { color: var(--muted); font-weight: 400; }
 
       @media (max-width: 860px) {
-        .nav-links {
-          display: none;
-        }
-
-        .hero {
-          min-height: auto;
-          padding-top: 120px;
-        }
-
-        .product-scene {
-          position: relative;
-          inset: auto;
-          width: 100%;
-          min-width: 0;
-          margin-top: 40px;
-          transform: none;
-          opacity: 1;
-        }
-
-        .dashboard,
-        .grid.three,
-        .grid.two,
-        .download-panel,
-        .privacy-row {
-          grid-template-columns: 1fr;
-        }
-
-        .section-head {
-          display: block;
-        }
-
-        .section-head p {
-          margin-top: 14px;
-        }
+        .hero-grid { grid-template-columns: 1fr; gap: 28px; }
+        .term-panel { order: -1; }
+        .grid.three, .grid.two, .dl-grid { grid-template-columns: 1fr; }
+        .nav-links { display: none; }
       }
 
       @media (max-width: 560px) {
-        .shell {
-          width: min(100% - 28px, 1120px);
-        }
+        .shell { width: calc(100% - 28px); }
+        .actions, .button { width: 100%; }
+        .button { justify-content: center; }
+        section.block { padding: 54px 0; }
+        .nav-status .label { display: none; }
+      }
 
-        h1 {
-          font-size: clamp(2.7rem, 17vw, 4.6rem);
-        }
-
-        .hero-copy {
-          font-size: 1rem;
-        }
-
-        .actions,
-        .button {
-          width: 100%;
-        }
-
-        .button {
-          padding: 0 14px;
-        }
-
-        section {
-          padding: 60px 0;
-        }
+      @media (prefers-reduced-motion: reduce) {
+        .scanbeam { display: none; }
+        .dot { animation: none; }
+        html { scroll-behavior: auto; }
       }
     </style>
   </head>
+
   <body>
+    <div class="backdrop" aria-hidden="true"><div class="scanbeam"></div></div>
+
     <header class="topbar">
       <nav class="nav shell" aria-label="Principal">
-        <a class="brand" href="#inicio" aria-label="OBSREC inicio">
-          <span class="brand-mark" aria-hidden="true">
-            <span></span><span></span><span></span><span></span>
-          </span>
-          <span>OBSREC</span>
-        </a>
+        <a class="brand" href="#inicio" aria-label="obsee inicio">
+          <b>obsee</b>
         <div class="nav-links">
-          <a href="#como-funciona">Como funciona</a>
-          <a href="#proposito">Proposito</a>
-          <a href="#descargar">Descargar</a>
+          <a href="#como-funciona">como_funciona</a>
+          <a href="#proposito">proposito</a>
+          <a href="#privacidad">privacidad</a>
+          <a href="#descargar">descargar</a>
         </div>
+        <span class="nav-status">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="label">online</span>
+        </span>
       </nav>
     </header>
 
     <main id="inicio">
+      <!-- HERO -->
       <section class="hero">
-        <div class="product-scene" aria-hidden="true">
-          <div class="window">
-            <div class="window-bar">
-              <span class="dot"></span>
-              <span class="dot"></span>
-              <span class="dot"></span>
+        <div class="shell hero-grid">
+          <div>
+            <div class="prompt-line">
+              <span class="arrow">→</span> ~/obsee · ia integrada para obs studio
             </div>
-            <div class="dashboard">
-              <div class="mock-card">
-                <div class="mock-title"></div>
-                <div class="mock-line"></div>
-                <div class="mock-line short"></div>
-                <div class="meter"><span></span><span></span><span></span></div>
-              </div>
-              <div class="mock-card">
-                <div class="mock-title"></div>
-                <div class="mock-line"></div>
-                <div class="mock-line short"></div>
-              </div>
-              <div class="mock-card wide">
-                <div class="mock-title"></div>
-                <div class="mock-line"></div>
-                <div class="mock-line"></div>
-                <div class="mock-line short"></div>
-              </div>
+            <h1><span class="accent">obs</span>ee<svg class="cpu-cursor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M5 6a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -12" /><path d="M8 10v-2h2m6 6v2h-2m-4 0h-2v-2m8 -4v-2h-2" /><path d="M3 10h2" /><path d="M3 14h2" /><path d="M10 3v2" /><path d="M14 3v2" /><path d="M21 10h-2" /><path d="M21 14h-2" /><path d="M14 21v-2" /><path d="M10 21v-2" /></svg></h1>
+            <p class="hero-copy">
+              analiza tu computadora, recomienda ajustes de <b>streaming</b> o
+              <b>grabacion</b> para obs studio y <b>explica cada cambio</b> antes de
+              aplicarlo. menos prueba y error, mas control.
+            </p>
+            <div class="actions">
+              <a class="button primary" href="#descargar">
+                <span class="pre">$</span> descargar obsee
+              </a>
+              <a
+                class="button ghost"
+                href="https://github.com/AlanSan1195/OBSREC"
+                rel="noreferrer"
+              >
+                <span class="pre">./</span> ver codigo
+              </a>
             </div>
+            <p class="note"> configuración inicial para tu obs, sin ser un experto.</p>
           </div>
-        </div>
 
-        <div class="shell hero-content">
-          <div class="eyebrow"><span class="status-dot"></span> IA integrada para OBS Studio</div>
-          <h1>OBSREC</h1>
-          <p class="hero-copy">
-            Analiza tu computadora, recomienda ajustes de streaming o grabacion para OBS y explica
-            cada cambio antes de aplicarlo.
-          </p>
-          <div class="actions" aria-label="Descargas principales">
-            <a class="button primary" href="#descargar">Descargar OBSREC</a>
-            <a class="button secondary" href="https://github.com/AlanSan1195/OBSREC" rel="noreferrer">
-              Ver codigo
-            </a>
+          <div class="panel term-panel" aria-hidden="true">
+            <div class="panel-head">
+              <span class="tick"></span>
+              <h3>obsee — analisis</h3>
+              <span class="meta"> live</span>
+            </div>
+            <div class="panel-body term-mock">
+              <div class="row"><span class="c">./analyze --pc</span><span class="ok">ok</span></div>
+              <div class="sep"></div>
+              <div class="row"><span class="k">cpu</span><span class="v">ryzen 7 · 8c/16t</span></div>
+              <div class="row"><span class="k">gpu</span><span class="v">rtx 4060 · nvenc</span></div>
+              <div class="row"><span class="k">ram</span><span class="v">32gb</span></div>
+              <div class="row"><span class="k">modo</span><span class="v">stream + rec</span></div>
+              <div class="sep"></div>
+              <div class="row"><span class="c">./recommend</span><span class="ok">→ 1080p60</span></div>
+              <div class="row"><span class="k">encoder</span><span class="v">nvenc h.264</span></div>
+              <div class="row"><span class="k">bitrate</span><span class="v">8000 kbps</span></div>
+              <div class="bar"><i style="width: 78%"></i></div>
+              <div class="sep"></div>
+              <div class="row"><span class="k">obs.websocket</span><span class="ok">conectado ●</span></div>
+            </div>
           </div>
-          <p class="note">Beta para creadores que quieren configurar OBS con menos prueba y error.</p>
         </div>
       </section>
 
-      <section id="como-funciona">
+      <!-- 01 COMO FUNCIONA -->
+      <section id="como-funciona" class="block">
         <div class="shell">
           <div class="section-head">
-            <h2>De tu hardware a una configuracion clara.</h2>
+            <div class="section-index">
+              <span class="num">analisis local · ia · obs-websocket</span>
+            </div>
+            <h2>de tu hardware a una configuracion clara.</h2>
             <p>
-              OBSREC combina analisis local, recomendacion asistida por IA y comparacion directa
-              con tu configuracion actual de OBS.
+              obsee combina analisis local, recomendacion asistida por ia y comparacion
+              directa con tu configuracion actual de obs.
             </p>
           </div>
           <div class="grid three">
-            <article class="card step">
-              <span class="step-number">1</span>
-              <strong>Analiza tu PC</strong>
-              <p>Detecta CPU, GPU, memoria, sistema operativo y el modo que necesitas: stream, grabacion o ambos.</p>
+            <article class="panel card">
+              <div class="panel-body">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>
+                </span>
+                <div class="card-cmd"><span class="hash">01</span> ./analiza --pc</div>
+                <strong>analiza tu pc</strong>
+                <p>detecta cpu, gpu, memoria, sistema operativo y el modo que necesitas: stream, grabacion o ambos.</p>
+              </div>
             </article>
-            <article class="card step">
-              <span class="step-number">2</span>
-              <strong>Recomienda ajustes</strong>
-              <p>Propone resolucion, FPS, encoder, bitrate y formato segun tu equipo y plataforma.</p>
+            <article class="panel card">
+              <div class="panel-body">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+                </span>
+                <div class="card-cmd"><span class="hash">02</span> ./recomienda</div>
+                <strong>recomienda ajustes</strong>
+                <p>propone resolucion, fps, encoder, bitrate y formato segun tu equipo y plataforma.</p>
+              </div>
             </article>
-            <article class="card step">
-              <span class="step-number">3</span>
-              <strong>Explica y aplica</strong>
-              <p>Muestra que cambiara, permite editar la recomendacion y la importa a OBS cuando estes listo.</p>
+            <article class="panel card">
+              <div class="panel-body">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </span>
+                <div class="card-cmd"><span class="hash">03</span> ./aplica --obs</div>
+                <strong>explica y aplica</strong>
+                <p>muestra que cambiara, permite editar la recomendacion y la importa a obs cuando estes listo.</p>
+              </div>
             </article>
           </div>
         </div>
       </section>
 
-      <section id="proposito" class="purpose">
+      <!-- 02 PROPOSITO -->
+      <section id="proposito" class="block">
         <div class="shell">
           <div class="section-head">
-            <h2>Su proposito es quitar la caja negra de OBS.</h2>
+            <div class="section-index">
+              <span class="num">aprende sobre configuracón</span>
+            </div>
+            <h2>quita la caja negra de obs.</h2>
             <p>
-              La herramienta no busca reemplazar OBS. Busca ayudarte a entender por que una
+              la herramienta no busca reemplazar obs. busca ayudarte a entender por que una
               configuracion tiene sentido para tu equipo.
             </p>
           </div>
           <div class="grid two">
-            <article class="card">
-              <strong>Para streamers y creadores</strong>
-              <p>
-                Ideal si quieres empezar rapido, evitar configuraciones exageradas y adaptar tu
-                perfil para Twitch, YouTube o grabacion local.
-              </p>
+            <article class="panel card">
+              <div class="panel-body">
+                <div class="card-cmd">./for --streamers</div>
+                <strong>para streamers y creadores</strong>
+                <p>
+                  ideal si quieres empezar rapido, evitar configuraciones exageradas y adaptar
+                  tu perfil para twitch, youtube o grabacion local.
+                </p>
+              </div>
             </article>
-            <article class="card">
-              <strong>Con respaldo local</strong>
-              <p>
-                Si la IA integrada no esta disponible, OBSREC sigue funcionando con recomendaciones
-                locales seguras para no romper tu flujo.
-              </p>
+            <article class="panel card">
+              <div class="panel-body">
+                <div class="card-cmd">./fallback --local</div>
+                <strong>con respaldo local</strong>
+                <p>
+                  si la ia integrada no esta disponible, obsee sigue funcionando con
+                  recomendaciones locales seguras para no romper tu flujo.
+                </p>
+              </div>
             </article>
           </div>
         </div>
       </section>
 
-      <section>
-        <div class="shell privacy-row">
-          <article class="card">
-            <strong>Privacidad practica</strong>
-            <p>
-              Para generar recomendaciones se envia informacion tecnica del equipo y preferencias
-              de configuracion. No se envian archivos, claves de OBS ni contenido de tus escenas.
-            </p>
-          </article>
-          <article class="card">
-            <strong>Backend de IA</strong>
-            <p>
-              La clave del proveedor de IA vive en el backend, no dentro de la app de escritorio.
-            </p>
-            <div id="backendStatus" class="backend-status" role="status">
-              <span aria-hidden="true"></span>
-              Comprobando backend...
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section id="descargar" class="download">
+      <!-- 03 PRIVACIDAD -->
+      <section id="privacidad" class="block">
         <div class="shell">
           <div class="section-head">
-            <h2>Descarga la beta.</h2>
+            <div class="section-index">
+              <span class="num">privacidad</span>
+            </div>
+            <h2>sientete tranquilo.</h2>
+          </div>
+          <div class="grid two">
+            <article class="panel card">
+              <div class="panel-body">
+                <div class="card-cmd">./privacy --info</div>
+                <strong>que se envia</strong>
+                <p>
+                  para generar recomendaciones se envia informacion tecnica del equipo y
+                  preferencias de configuracion. no se envian archivos, claves de obs ni
+                  contenido de tus escenas.
+                </p>
+              </div>
+            </article>
+            <article class="panel card">
+              <div class="panel-body">
+                <div class="card-cmd">./backend --status</div>
+                <strong>backend de ia</strong>
+                <p>
+                  la clave del proveedor de ia vive en el backend, no en la app de escritorio:
+                  <b>no necesitas tu propia api key</b>. y si la ia no esta disponible, obsee
+                  sigue dando recomendaciones con su <b>respaldo local</b>.
+                </p>
+                <div id="backendStatus" class="status" role="status">
+                  <span class="led" aria-hidden="true"></span>
+                  <span class="msg">comprobando backend...</span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04 DESCARGAR -->
+      <section id="descargar" class="block">
+        <div class="shell">
+          <div class="section-head">
+            <div class="section-index">
+              <span class="num">Gartis</span>
+            </div>
+            <h2>descarga la beta.</h2>
             <p>
-              Instala OBSREC, abre OBS Studio, conecta WebSocket y genera tu primera recomendacion.
+              instala obsee, abre obs studio, conecta websocket y genera tu primera
+              recomendacion.
             </p>
           </div>
-          <div class="download-panel">
-            <article class="card download-card">
-              <div>
-                <div class="platform">
-                  <div>
-                    <strong>OBSREC para macOS</strong>
-                    <p>Instalador DMG para equipos Mac.</p>
-                  </div>
-                  <span class="platform-icon" aria-hidden="true">M</span>
-                </div>
-                <ul>
-                  <li>Apple Silicon e Intel segun build publicado.</li>
-                  <li>Requiere OBS Studio con WebSocket habilitado.</li>
-                </ul>
+          <div class="dl-grid">
+            <article class="panel dl-card">
+              <div class="panel-head">
+                <span class="tick"></span>
+                <h3>obsee — macos</h3>
+                <span class="meta">.dmg</span>
               </div>
-              <a
-                class="button primary"
-                href="https://github.com/AlanSan1195/OBSREC/releases/latest/download/OBSREC-Mac.dmg"
-                rel="noreferrer"
-              >
-                Descargar para Mac
-              </a>
+              <div class="panel-body">
+                <div class="dl-os"><span class="pre">~/</span>macos</div>
+                <ul>
+                  <li>apple silicon e intel segun build publicado.</li>
+                  <li>requiere obs studio con websocket habilitado.</li>
+                </ul>
+                <a
+                  class="button primary"
+                  href="https//:github.com/AlanSan1195/OBSREC/releases/latest/download/OBSREC-Mac.dmg"
+                  rel="noreferrer"
+                >
+                  <span class="pre">$</span> descargar para mac
+                </a>
+              </div>
             </article>
-            <article class="card download-card">
-              <div>
-                <div class="platform">
-                  <div>
-                    <strong>OBSREC para Windows</strong>
-                    <p>Instalador para Windows 10 y 11.</p>
-                  </div>
-                  <span class="platform-icon" aria-hidden="true">W</span>
-                </div>
-                <ul>
-                  <li>Asistente de instalacion para PC.</li>
-                  <li>Recomendaciones para streaming, grabacion o ambos.</li>
-                </ul>
+            <article class="panel dl-card">
+              <div class="panel-head">
+                <span class="tick"></span>
+                <h3>obsee — windows</h3>
+                <span class="meta">.exe</span>
               </div>
-              <a
-                class="button secondary"
-                href="https://github.com/AlanSan1195/OBSREC/releases/latest/download/OBSREC-Windows-Setup.exe"
-                rel="noreferrer"
-              >
-                Descargar para Windows
-              </a>
+              <div class="panel-body">
+                <div class="dl-os"><span class="pre">~/</span>windows</div>
+                <ul>
+                  <li>asistente de instalacion para windows 10 y 11.</li>
+                  <li>recomendaciones para stream, grabacion o ambos.</li>
+                </ul>
+                <a
+                  class="button ghost"
+                  href="https://github.com/AlanSan1195/OBSREC/releases/latest/download/OBSREC-Windows-Setup.exe"
+                  rel="noreferrer"
+                >
+                  <span class="pre">$</span> descargar para windows
+                </a>
+              </div>
             </article>
           </div>
           <p class="note">
-            Cuando publiques instaladores finales, estos botones pueden apuntar directo a los assets
-            .dmg y .exe de GitHub Releases.
+            // los botones apuntan a los assets .dmg y .exe del ultimo release.
           </p>
         </div>
       </section>
     </main>
 
     <footer>
-      <div class="footer-inner shell">
-        <span>OBSREC</span>
-        <span>Configuracion explicable para OBS Studio.</span>
+      <div class="shell">
+        <div class="foot">
+          <span>© 2026 obsee · configuración para OBS con IA con explicación  </span>
+          <div class="foot-links">
+            <a href="https://github.com/AlanSan1195/OBSREC" rel="noreferrer">github@obsrec</a>
+            <a href="#inicio">↑ top</a>
+          </div>
+        </div>
+        
       </div>
     </footer>
 
@@ -756,19 +932,27 @@
 
       async function checkBackend() {
         if (!backendStatus) return;
+        const msg = backendStatus.querySelector(".msg");
+        const setState = (state, text) => {
+          backendStatus.classList.remove("is-ok", "is-local", "is-down");
+          if (state) backendStatus.classList.add(state);
+          msg.textContent = text;
+        };
 
         try {
           const response = await fetch("/api/health", { headers: { accept: "application/json" } });
           if (!response.ok) throw new Error("Backend unavailable");
 
           const health = await response.json();
-          backendStatus.classList.toggle("is-ok", Boolean(health.ok));
-          backendStatus.lastChild.textContent = health.ok
-            ? " Backend activo"
-            : " Backend pendiente de configuracion";
+          if (health.ok && health.groqConfigured) {
+            setState("is-ok", "ia activa ●");
+          } else if (health.ok) {
+            setState("is-local", "backend activo · sin clave ia (modo local)");
+          } else {
+            setState(null, "backend pendiente de configuracion");
+          }
         } catch {
-          backendStatus.classList.remove("is-ok");
-          backendStatus.lastChild.textContent = " Backend no disponible";
+          setState("is-down", "backend no disponible · respaldo local activo");
         }
       }
 

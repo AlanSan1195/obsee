@@ -399,6 +399,63 @@
         letter-spacing: 0.04em;
       }
 
+      /* ---- ayuda para abrir app sin firma ---- */
+      .dl-help {
+        margin-top: 18px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        font-size: 0.82rem;
+      }
+
+      .dl-help > summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 12px 16px;
+        color: var(--phosphor);
+        font-weight: 500;
+        letter-spacing: 0.03em;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .dl-help > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .dl-help > summary .chev {
+        color: var(--phosphor-dim);
+        transition: transform 0.16s ease;
+      }
+
+      .dl-help[open] > summary .chev {
+        transform: rotate(90deg);
+      }
+
+      .dl-help .help-body {
+        padding: 0 16px 16px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .dl-help .help-body strong {
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      .dl-help code {
+        display: block;
+        margin: 10px 0;
+        padding: 10px 12px;
+        border: 1px solid var(--border-strong);
+        background: rgba(94, 255, 159, 0.05);
+        color: var(--phosphor);
+        font-family: var(--mono);
+        font-size: 0.8rem;
+        user-select: all;
+        overflow-x: auto;
+      }
+
       /* ---- hero mock terminal ---- */
       .term-mock {
         font-size: 0.78rem;
@@ -910,6 +967,33 @@
           <p class="note">
             // los botones apuntan a los assets .dmg y .exe del ultimo release.
           </p>
+
+          <details class="dl-help">
+            <summary>
+              <span class="chev">&gt;</span>
+              ¿macOS dice que la app "esta danada"? abre esto
+            </summary>
+            <div class="help-body">
+              <p>
+                es normal: obsee es una app gratuita aun sin firma de apple, asi que
+                macOS la bloquea con un aviso enganoso. <strong>no esta danada.</strong>
+                para abrirla la primera vez:
+              </p>
+              <p style="margin-top: 10px;">
+                <strong>opcion 1 — terminal.</strong> abre la app "Terminal" y pega:
+              </p>
+              <code>xattr -cr /Applications/OBSREC.app</code>
+              <p>luego abre OBSREC normalmente.</p>
+              <p style="margin-top: 10px;">
+                <strong>opcion 2 — clic derecho.</strong> en Aplicaciones, clic derecho
+                sobre OBSREC &gt; Abrir &gt; Abrir. solo hace falta la primera vez.
+              </p>
+              <p style="margin-top: 10px; color: var(--faint);">
+                // en windows: si SmartScreen avisa, pulsa "mas informacion" &gt;
+                "ejecutar de todos modos".
+              </p>
+            </div>
+          </details>
         </div>
       </section>
     </main>

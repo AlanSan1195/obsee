@@ -1,4 +1,4 @@
-import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationField, AIRecommendationRequest, AIRecommendationSettings, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, CameraLayout, CreateGuidedSourceConfig, MicConnection, MicProfileRequest, MicProfileResponse, MicType, NoiseSuppressMethod, OBSAudioConfig, OBSAudioNoiseGate, OBSBackup, OBSConfig, OBSConnectionSettings, OBSMode, OBSPlatform, OBSSettingsSnapshot, SetCameraLayoutInput, SourceKindFriendly, SystemInfo } from './types';
+import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationField, AIRecommendationRequest, AIRecommendationSettings, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, CameraLayout, ConsoleComponentSpec, ConsoleModel, ConsoleProfileRequest, ConsoleProfileResponse, CreateGuidedSourceConfig, MicConnection, MicProfileRequest, MicProfileResponse, MicType, NoiseSuppressMethod, OBSAudioConfig, OBSAudioNoiseGate, OBSBackup, OBSConfig, OBSConnectionSettings, OBSMode, OBSPlatform, OBSSettingsSnapshot, SetCameraLayoutInput, SourceKindFriendly, SystemInfo } from './types';
 
 type ValidationResult<T> =
   | { success: true; value: T }
@@ -25,6 +25,7 @@ const cameraLayouts: CameraLayout[] = ['facecam', 'fullscreen'];
 const noiseSuppressMethods: NoiseSuppressMethod[] = ['rnnoise', 'speex', 'nvafx'];
 const micTypes: MicType[] = ['condenser', 'dynamic', 'electret', 'unknown'];
 const micConnections: MicConnection[] = ['usb', 'xlr', 'analog', 'wireless', 'unknown'];
+const consoleModels: ConsoleModel[] = ['ps5', 'ps5_pro', 'xbox_series_x', 'xbox_series_s', 'switch', 'switch2'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -732,6 +733,95 @@ export function validateMicProfileResponse(value: unknown): ValidationResult<Mic
           reason: asReason(lim.reason),
         },
       },
+      reasoning: isNonEmptyString(value.reasoning) ? value.reasoning.trim() : 'Sin explicacion.',
+    },
+  };
+}
+
+// --- Analisis de consola ---
+
+function validateComponentSpec(value: unknown, fallbackName: string): ConsoleComponentSpec {
+  const v = isRecord(value) ? value : {};
+  return {
+    name: isNonEmptyString(v.name) ? v.name.trim().slice(0, 80) : fallbackName,
+    identified: v.identified === true,
+    summary: asReason(v.summary),
+    maxResolution: isNonEmptyString(v.maxResolution) && parseResolution(v.maxResolution).success ? v.maxResolution.trim() : undefined,
+    maxFps: isFiniteNumber(v.maxFps) ? Math.min(240, Math.max(0, Math.round(v.maxFps))) : undefined,
+    hdr: typeof v.hdr === 'boolean' ? v.hdr : undefined,
+    vrr: typeof v.vrr === 'boolean' ? v.vrr : undefined,
+    notes: isNonEmptyString(v.notes) ? asReason(v.notes) : undefined,
+  };
+}
+
+export function validateConsoleProfileRequest(value: unknown): ValidationResult<ConsoleProfileRequest> {
+  if (!isRecord(value)) {
+    return { success: false, message: 'La solicitud de perfil de consola debe ser un objeto.' };
+  }
+  if (!consoleModels.includes(value.console as ConsoleModel)) {
+    return { success: false, message: 'Consola no soportada.' };
+  }
+  if (!platforms.includes(value.platform as OBSPlatform)) {
+    return { success: false, message: 'Plataforma no valida para el perfil de consola.' };
+  }
+  if (!modes.includes(value.mode as OBSMode)) {
+    return { success: false, message: 'Modo no valido para el perfil de consola.' };
+  }
+  const systemInfo = validateSystemInfo(value.systemInfo);
+  if (!systemInfo.success) return systemInfo;
+
+  return {
+    success: true,
+    value: {
+      console: value.console as ConsoleModel,
+      platform: value.platform as OBSPlatform,
+      mode: value.mode as OBSMode,
+      systemInfo: systemInfo.value,
+      captureCard: isNonEmptyString(value.captureCard) ? value.captureCard.trim().slice(0, 128) : undefined,
+      monitor: isNonEmptyString(value.monitor) ? value.monitor.trim().slice(0, 128) : undefined,
+      monitorRefreshRate: isFiniteNumber(value.monitorRefreshRate) ? Math.round(value.monitorRefreshRate) : undefined,
+      captureMaxResolution: isNonEmptyString(value.captureMaxResolution) && parseResolution(value.captureMaxResolution).success
+        ? value.captureMaxResolution.trim()
+        : undefined,
+      captureMaxFps: isFiniteNumber(value.captureMaxFps) ? Math.round(value.captureMaxFps) : undefined,
+      os: isNonEmptyString(value.os) ? value.os.trim() : undefined,
+    },
+  };
+}
+
+export function validateConsoleProfileResponse(value: unknown): ValidationResult<ConsoleProfileResponse> {
+  if (!isRecord(value) || !isRecord(value.profile)) {
+    return { success: false, message: 'El perfil de consola devuelto esta incompleto.' };
+  }
+
+  // Reusa el validador de la recomendacion de OBS para el bloque recommendations.
+  const rec = validateAIRecommendation(value);
+  if (!rec.success) {
+    return { success: false, message: `Ajustes de OBS de consola: ${rec.message}` };
+  }
+
+  const p = value.profile;
+  return {
+    success: true,
+    value: {
+      source: value.source === 'local' ? 'local' : 'ai',
+      profile: {
+        console: validateComponentSpec(p.console, 'Consola'),
+        captureCard: validateComponentSpec(p.captureCard, 'Capturadora'),
+        monitor: validateComponentSpec(p.monitor, 'Monitor'),
+        bottleneck: asReason(p.bottleneck),
+        captureResolution: isNonEmptyString(p.captureResolution) && parseResolution(p.captureResolution).success
+          ? p.captureResolution.trim()
+          : '1920x1080',
+        captureFps: Math.round(clampNumber(p.captureFps, 1, 240, 60)),
+        consoleSettings: Array.isArray(p.consoleSettings)
+          ? p.consoleSettings.filter(isNonEmptyString).map((s) => s.trim().slice(0, 200)).slice(0, 8)
+          : [],
+        sources: Array.isArray(p.sources)
+          ? p.sources.filter(isNonEmptyString).map((s) => s.trim()).slice(0, 6)
+          : undefined,
+      },
+      recommendations: rec.value.recommendations,
       reasoning: isNonEmptyString(value.reasoning) ? value.reasoning.trim() : 'Sin explicacion.',
     },
   };

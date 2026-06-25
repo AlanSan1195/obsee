@@ -1,6 +1,6 @@
 import { useAppStore } from '../store';
 import { inferObsUsage } from '../../shared/obsUsage';
-import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationRequest, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, BeginGuidedSourceResult, CameraLayout, CreateGuidedSourceConfig, MicProfileRequest, MicProfileResponse, OBSBackup, OBSAudioConfig, OBSAudioSettingsSnapshot, OBSConfig, OBSConnectionSettings, OBSSettingsSnapshot, ResolvedSourceKind, SceneSourcesSnapshot, ScenesSnapshot, SetCameraLayoutInput, SystemInfo } from '../../shared/types';
+import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationRequest, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, BeginGuidedSourceResult, CameraLayout, CaptureCapabilities, ConsoleProfileRequest, ConsoleProfileResponse, CreateGuidedSourceConfig, MicProfileRequest, MicProfileResponse, OBSBackup, OBSAudioConfig, OBSAudioSettingsSnapshot, OBSConfig, OBSConnectionSettings, OBSSettingsSnapshot, PeripheralsSnapshot, ResolvedSourceKind, SceneSourcesSnapshot, ScenesSnapshot, SetCameraLayoutInput, SystemInfo } from '../../shared/types';
 
 function getElectronAPI() {
   if (!window.electronAPI) {
@@ -26,6 +26,10 @@ export function useElectronAPI() {
   const setAvailableSourceKinds = useAppStore((state) => state.setAvailableSourceKinds);
   const setMicProfile = useAppStore((state) => state.setMicProfile);
   const setIsProfilingMic = useAppStore((state) => state.setIsProfilingMic);
+  const setPeripherals = useAppStore((state) => state.setPeripherals);
+  const setConsoleProfile = useAppStore((state) => state.setConsoleProfile);
+  const setIsAnalyzingConsole = useAppStore((state) => state.setIsAnalyzingConsole);
+  const setCaptureCapabilities = useAppStore((state) => state.setCaptureCapabilities);
 
   const getSystemInfo = async () => {
     try {
@@ -70,6 +74,53 @@ export function useElectronAPI() {
       return null;
     } finally {
       setIsProfilingMic(false);
+    }
+  };
+
+  const getCaptureCapabilities = async (deviceName?: string): Promise<CaptureCapabilities | null> => {
+    try {
+      const result = await getElectronAPI().obs.getCaptureCapabilities({ deviceName });
+      if (result.success && result.capabilities) {
+        setCaptureCapabilities(result.capabilities);
+        return result.capabilities;
+      }
+      setError(result.message);
+      return null;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'No se pudieron leer las capacidades de la capturadora');
+      return null;
+    }
+  };
+
+  const getPeripherals = async (): Promise<PeripheralsSnapshot | null> => {
+    try {
+      const peripherals = await getElectronAPI().system.getPeripherals();
+      setPeripherals(peripherals);
+      return peripherals;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'No se pudieron detectar los perifericos');
+      return null;
+    }
+  };
+
+  const profileConsole = async (request: ConsoleProfileRequest): Promise<ConsoleProfileResponse | null> => {
+    setIsAnalyzingConsole(true);
+    setError(null);
+    try {
+      const profile = await getElectronAPI().ai.profileConsole(request);
+      setConsoleProfile(profile);
+      // Reusa el flujo de aplicar de OBS: la recomendacion alimenta OBSComparison/ImportButton.
+      setRecommendation({
+        source: profile.source,
+        recommendations: profile.recommendations,
+        reasoning: profile.reasoning,
+      });
+      return profile;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'No se pudo analizar la consola con IA');
+      return null;
+    } finally {
+      setIsAnalyzingConsole(false);
     }
   };
 
@@ -363,6 +414,9 @@ export function useElectronAPI() {
     getSourceScreenshot,
     pickImageFile,
     profileMicrophone,
+    getPeripherals,
+    getCaptureCapabilities,
+    profileConsole,
   };
 }
 
@@ -396,16 +450,19 @@ declare global {
         renameSource: (arg: { inputName: string; newInputName: string }) => Promise<{ success: boolean; message: string }>;
         setSourceEnabled: (arg: { sceneName: string; sceneItemId: number; enabled: boolean }) => Promise<{ success: boolean; message: string }>;
         sourceScreenshot: (arg: { sourceName: string; maxWidth?: number }) => Promise<{ success: boolean; message: string; imageData?: string }>;
+        getCaptureCapabilities: (arg: { deviceName?: string }) => Promise<{ success: boolean; message: string; capabilities?: CaptureCapabilities }>;
         pickImageFile: () => Promise<{ canceled: boolean; filePath?: string }>;
         onConnectionChanged: (callback: (status: { connected: boolean; message: string }) => void) => () => void;
       };
       system: {
         getInfo: () => Promise<SystemInfo>;
+        getPeripherals: () => Promise<PeripheralsSnapshot>;
       };
       ai: {
         getRecommendation: (request: AIRecommendationRequest) => Promise<AIRecommendation>;
         explainRecommendation: (request: AIRecommendationExplanationRequest) => Promise<AIRecommendationExplanation>;
         profileMicrophone: (request: MicProfileRequest) => Promise<MicProfileResponse>;
+        profileConsole: (request: ConsoleProfileRequest) => Promise<ConsoleProfileResponse>;
       };
     };
   }

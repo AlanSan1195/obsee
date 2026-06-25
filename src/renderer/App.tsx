@@ -3,13 +3,18 @@ import { useAppStore } from './store';
 import { ModeSelector } from './components/ModeSelector';
 import { PlatformSelector } from './components/PlatformSelector';
 import { AnalyzeButton } from './components/AnalyzeButton';
-import { PCAnalysis } from './components/PCAnalysis';
+import { SourceTargetSelector } from './components/SourceTargetSelector';
+import { ConsoleSelector } from './components/ConsoleSelector';
+import { ConsoleDetection } from './components/ConsoleDetection';
+import { ConsoleReport } from './components/ConsoleReport';
 import { Recommendations } from './components/Recommendations';
 import { OBSComparison } from './components/OBSComparison';
 import { AudioConfiguration } from './components/AudioConfiguration';
 import { ScenesPanel } from './components/ScenesPanel';
+import { ConnectPanel } from './components/ConnectPanel';
 import { ImportButton } from './components/ImportButton';
 import { StatusBar } from './components/StatusBar';
+import { useElectronAPI } from './hooks/useElectronAPI';
 import { IconAlert, IconX } from './components/ui';
 import packageJson from '../../package.json';
 
@@ -30,11 +35,16 @@ function MetaItem({ label, value, accent }: { label: string; value: string; acce
   );
 }
 
-function StatusRow({ label, value, accent }: { label: string; value: React.ReactNode; accent?: boolean }) {
+function StatusRow({ label, value, accent, title }: { label: string; value: React.ReactNode; accent?: boolean; title?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
-      <span className="text-text-faint lowercase">{label}</span>
-      <span className={`text-right ${accent ? 'text-primary' : 'text-text'}`}>{value}</span>
+      <span className="shrink-0 text-text-faint lowercase">{label}</span>
+      <span
+        className={`min-w-0 truncate text-right ${accent ? 'text-primary' : 'text-text'}`}
+        title={title}
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -47,11 +57,13 @@ export default function App() {
     platform,
     systemInfo,
     obsConnected,
+    analysisTarget,
     setObsAudioSnapshot,
     setObsConnected,
     setObsMessage,
     setObsSettingsSnapshot,
   } = useAppStore();
+  const { disconnectFromOBS } = useElectronAPI();
 
   useEffect(() => {
     if (!window.electronAPI) return undefined;
@@ -128,9 +140,18 @@ export default function App() {
         <aside className="terminal-panel self-start p-4 text-xs">
           <div className="mb-3 flex items-center justify-between border-b border-border pb-2 text-[0.7rem] lowercase tracking-terminal text-text-faint">
             <span>~/status</span>
-            <span className={obsConnected ? 'text-primary' : 'text-text-muted'}>
-              {obsConnected ? '● live' : '○ idle'}
-            </span>
+            {obsConnected ? (
+              <button
+                type="button"
+                onClick={() => void disconnectFromOBS()}
+                className="text-text-muted transition-colors hover:text-red-300"
+                title="Desconectar de OBS"
+              >
+                desconectar ✕
+              </button>
+            ) : (
+              <span className="text-text-muted">○ idle</span>
+            )}
           </div>
           <StatusRow
             label="status"
@@ -140,13 +161,21 @@ export default function App() {
           <StatusRow label="mode" value={mode ? modeLabels[mode] : 'unset'} />
           <StatusRow label="platform" value={platform ?? 'unset'} />
           <div className="my-2 border-t border-border/60" />
-          <StatusRow label="cpu" value={systemInfo ? `${systemInfo.cpu.cores} cores` : '—'} />
-          <StatusRow label="ram" value={systemInfo ? `${systemInfo.ram.total}gb` : '—'} />
-          <StatusRow
-            label="nvenc"
-            value={systemInfo ? (systemInfo.gpu.hasNvenc ? 'yes' : 'no') : '—'}
-            accent={Boolean(systemInfo?.gpu.hasNvenc)}
-          />
+          {systemInfo ? (
+            <>
+              <StatusRow label="cpu" value={`${systemInfo.cpu.cores}c · ${systemInfo.cpu.model}`} title={systemInfo.cpu.model} />
+              <StatusRow label="gpu" value={systemInfo.gpu.model} title={systemInfo.gpu.model} />
+              <StatusRow label="ram" value={`${systemInfo.ram.total}gb`} />
+              <StatusRow label="os" value={`${systemInfo.os.distro} ${systemInfo.os.release}`} title={`${systemInfo.os.distro} ${systemInfo.os.release}`} />
+              <StatusRow
+                label="nvenc"
+                value={systemInfo.gpu.hasNvenc ? 'yes' : 'no (software)'}
+                accent={systemInfo.gpu.hasNvenc}
+              />
+            </>
+          ) : (
+            <div className="py-1.5 text-text-faint">hardware: corre <span className="text-text-muted">analyze</span> para detectarlo</div>
+          )}
         </aside>
       </header>
 
@@ -174,10 +203,27 @@ export default function App() {
       )}
 
       <main className="flex-1 space-y-5">
-        <div className="flex items-center gap-3 text-xs lowercase tracking-terminal text-text-faint">
-          <span> setup</span>
+        {!obsConnected && (
+          <>
+            <div className="flex items-center gap-3 text-xs lowercase tracking-terminal text-text-faint">
+              <span>conexion</span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <ConnectPanel />
+          </>
+        )}
+
+        <div className="flex items-center gap-3 pt-2 text-xs lowercase tracking-terminal text-text-faint">
+          <span>setup</span>
           <span className="h-px flex-1 bg-border" />
         </div>
+        <SourceTargetSelector />
+        {analysisTarget === 'console' && (
+          <>
+            <ConsoleSelector />
+            <ConsoleDetection />
+          </>
+        )}
         <div className="grid gap-5 lg:grid-cols-[3fr_2fr]">
           <ModeSelector />
           <PlatformSelector />
@@ -185,10 +231,10 @@ export default function App() {
         <AnalyzeButton />
 
         <div className="flex items-center gap-3 pt-2 text-xs lowercase tracking-terminal text-text-faint">
-          <span>diagnostico</span>
+          <span>recomendacion</span>
           <span className="h-px flex-1 bg-border" />
         </div>
-        <PCAnalysis />
+        <ConsoleReport />
         <Recommendations />
         <OBSComparison />
 

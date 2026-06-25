@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import type { AIRecommendation, MicProfileResponse, OBSAudioSettingsSnapshot, OBSConnectionSettings, OBSMode, OBSPlatform, OBSSettingsSnapshot, ResolvedSourceKind, Scene, SceneItemSummary, SystemInfo } from '../shared/types';
+import type { AIRecommendation, CaptureCapabilities, ConsoleModel, ConsoleProfileResponse, MicProfileResponse, OBSAudioSettingsSnapshot, OBSConnectionSettings, OBSMode, OBSPlatform, OBSSettingsSnapshot, PeripheralsSnapshot, ResolvedSourceKind, Scene, SceneItemSummary, SystemInfo } from '../shared/types';
+
+export type AnalysisTarget = 'pc' | 'console';
 
 interface AppState {
   mode: OBSMode | null;
@@ -21,6 +23,14 @@ interface AppState {
   availableSourceKinds: ResolvedSourceKind[] | null;
   micProfile: MicProfileResponse | null;
   isProfilingMic: boolean;
+  analysisTarget: AnalysisTarget;
+  consoleModel: ConsoleModel | null;
+  peripherals: PeripheralsSnapshot | null;
+  selectedCaptureCard: string;
+  selectedMonitor: string;
+  captureCapabilities: CaptureCapabilities | null;
+  consoleProfile: ConsoleProfileResponse | null;
+  isAnalyzingConsole: boolean;
 
   setMode: (mode: OBSMode) => void;
   setPlatform: (platform: OBSPlatform) => void;
@@ -41,6 +51,14 @@ interface AppState {
   setAvailableSourceKinds: (kinds: ResolvedSourceKind[] | null) => void;
   setMicProfile: (profile: MicProfileResponse | null) => void;
   setIsProfilingMic: (value: boolean) => void;
+  setAnalysisTarget: (target: AnalysisTarget) => void;
+  setConsoleModel: (model: ConsoleModel | null) => void;
+  setPeripherals: (peripherals: PeripheralsSnapshot | null) => void;
+  setSelectedCaptureCard: (value: string) => void;
+  setSelectedMonitor: (value: string) => void;
+  setCaptureCapabilities: (caps: CaptureCapabilities | null) => void;
+  setConsoleProfile: (profile: ConsoleProfileResponse | null) => void;
+  setIsAnalyzingConsole: (value: boolean) => void;
   reset: () => void;
 }
 
@@ -68,6 +86,14 @@ export const useAppStore = create<AppState>((set) => ({
   availableSourceKinds: null,
   micProfile: null,
   isProfilingMic: false,
+  analysisTarget: 'pc',
+  consoleModel: null,
+  peripherals: null,
+  selectedCaptureCard: '',
+  selectedMonitor: '',
+  captureCapabilities: null,
+  consoleProfile: null,
+  isAnalyzingConsole: false,
 
   setMode: (mode) => set({ mode }),
   setPlatform: (platform) => set({ platform }),
@@ -93,6 +119,14 @@ export const useAppStore = create<AppState>((set) => ({
   setAvailableSourceKinds: (availableSourceKinds) => set({ availableSourceKinds }),
   setMicProfile: (micProfile) => set({ micProfile }),
   setIsProfilingMic: (isProfilingMic) => set({ isProfilingMic }),
+  setAnalysisTarget: (analysisTarget) => set({ analysisTarget }),
+  setConsoleModel: (consoleModel) => set({ consoleModel }),
+  setPeripherals: (peripherals) => set({ peripherals }),
+  setSelectedCaptureCard: (selectedCaptureCard) => set({ selectedCaptureCard }),
+  setSelectedMonitor: (selectedMonitor) => set({ selectedMonitor }),
+  setCaptureCapabilities: (captureCapabilities) => set({ captureCapabilities }),
+  setConsoleProfile: (consoleProfile) => set({ consoleProfile }),
+  setIsAnalyzingConsole: (isAnalyzingConsole) => set({ isAnalyzingConsole }),
   reset: () => set({
     systemInfo: null,
     recommendation: null,
@@ -106,5 +140,11 @@ export const useAppStore = create<AppState>((set) => ({
     availableSourceKinds: null,
     micProfile: null,
     isProfilingMic: false,
+    consoleProfile: null,
+    isAnalyzingConsole: false,
+    peripherals: null,
+    selectedCaptureCard: '',
+    selectedMonitor: '',
+    captureCapabilities: null,
   }),
 }));

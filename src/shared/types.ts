@@ -244,6 +244,82 @@ export interface AIRecommendation {
   reasoning: string;
 }
 
+// --- Analisis de consola (PC + capturadora) ---
+
+export type ConsoleModel = 'ps5' | 'ps5_pro' | 'xbox_series_x' | 'xbox_series_s' | 'switch' | 'switch2';
+
+// Periféricos detectados localmente con systeminformation (solo lectura).
+export interface DetectedDisplay {
+  model: string;
+  main: boolean;
+  width: number;
+  height: number;
+  refreshRate: number;
+}
+
+export interface DetectedCaptureDevice {
+  name: string;
+  vendor?: string;
+}
+
+export interface PeripheralsSnapshot {
+  displays: DetectedDisplay[];
+  captureDevices: DetectedCaptureDevice[];
+}
+
+// Capacidades reales de la capturadora leidas desde OBS (no adivinadas por nombre).
+export interface CaptureCapabilities {
+  deviceName: string;
+  maxResolution?: string;
+  maxFps?: number;
+  resolutions: string[];
+}
+
+export interface ConsoleProfileRequest {
+  console: ConsoleModel;
+  captureCard?: string;
+  monitor?: string;
+  monitorRefreshRate?: number;
+  // Capacidades reales leidas de OBS (techo de captura verificado).
+  captureMaxResolution?: string;
+  captureMaxFps?: number;
+  platform: OBSPlatform;
+  mode: OBSMode;
+  // Hardware de la PC que corre OBS (para elegir encoder/bitrate).
+  systemInfo: SystemInfo;
+  os?: string;
+}
+
+export interface ConsoleComponentSpec {
+  name: string;
+  identified: boolean;
+  summary: string;
+  maxResolution?: string;
+  maxFps?: number;
+  hdr?: boolean;
+  vrr?: boolean;
+  notes?: string;
+}
+
+export interface ConsoleProfile {
+  console: ConsoleComponentSpec;
+  captureCard: ConsoleComponentSpec;
+  monitor: ConsoleComponentSpec;
+  bottleneck: string;
+  captureResolution: string;
+  captureFps: number;
+  consoleSettings: string[];
+  sources?: string[];
+}
+
+export interface ConsoleProfileResponse {
+  source: 'ai' | 'local';
+  profile: ConsoleProfile;
+  // Reusa el shape de la recomendacion de OBS para integrarse con el flujo de aplicar.
+  recommendations: AIRecommendationSettings;
+  reasoning: string;
+}
+
 // --- Escenas y fuentes guiadas ---
 
 // Categorias amigables que se muestran al usuario en el asistente.

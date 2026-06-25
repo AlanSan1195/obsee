@@ -1,5 +1,5 @@
 import Groq from 'groq-sdk';
-import type { AIRecommendationExplanationRequest, AIRecommendationRequest, AIServiceMessage, MicProfileRequest } from '../../src/shared/types';
+import type { AIRecommendationExplanationRequest, AIRecommendationRequest, AIServiceMessage, ConsoleProfileRequest, MicProfileRequest } from '../../src/shared/types';
 
 let groqInstance: Groq | null = null;
 
@@ -173,6 +173,107 @@ ${MIC_PROFILE_JSON_SHAPE}`;
       { role: 'user', content: knowledgePrompt },
     ],
     { model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b', temperature: 0.3, maxTokens: 2000 },
+  );
+
+  return parseJsonObject(response);
+}
+
+const CONSOLE_LABELS: Record<string, string> = {
+  ps5: 'PlayStation 5',
+  ps5_pro: 'PlayStation 5 Pro',
+  xbox_series_x: 'Xbox Series X',
+  xbox_series_s: 'Xbox Series S',
+  switch: 'Nintendo Switch',
+  switch2: 'Nintendo Switch 2',
+};
+
+const CONSOLE_PROFILE_JSON_SHAPE = `Responde SOLO con JSON valido y exactamente con esta forma:
+{
+  "profile": {
+    "console":     { "name": "", "identified": true, "summary": "", "maxResolution": "3840x2160", "maxFps": 120, "hdr": true, "vrr": true, "notes": "" },
+    "captureCard": { "name": "", "identified": true, "summary": "", "maxResolution": "1920x1080", "maxFps": 60,  "hdr": false, "vrr": false, "notes": "captura vs passthrough" },
+    "monitor":     { "name": "", "identified": true, "summary": "", "maxResolution": "3840x2160", "maxFps": 60,  "hdr": true, "vrr": false, "notes": "" },
+    "bottleneck": "explica que componente limita la cadena y por que",
+    "captureResolution": "1920x1080",
+    "captureFps": 60,
+    "consoleSettings": ["paso 1 en la consola", "paso 2", "..."],
+    "sources": ["https://..."]
+  },
+  "recommendations": {
+    "resolution": "1920x1080",
+    "fps": 60,
+    "encoder": "nvenc",
+    "bitrate": 6000,
+    "audio_bitrate": 320,
+    "recording_format": "mkv",
+    "recording_quality": "high"
+  },
+  "reasoning": "explicacion general en espanol"
+}`;
+
+const CONSOLE_PROFILE_RULES = `Reglas:
+- La capturadora suele ser el cuello de botella: distingue su resolucion/fps de CAPTURA (lo que graba OBS) de su PASSTHROUGH (lo que pasa al monitor). Muchas baratas pasan 4K pero capturan 1080p30/60.
+- "captureResolution"/"captureFps" = lo maximo que conviene capturar = el MENOR techo entre consola y capturadora.
+- "recommendations" son los ajustes de OBS en la PC: usa el hardware de la PC para "encoder"/"bitrate", pero limita "resolution"/"fps" al techo de captura. Nunca superes lo que la capturadora puede capturar.
+- "consoleSettings": pasos concretos para ajustar la salida de video de la consola (resolucion, fps, HDR/RGB) de forma compatible con la capturadora.
+- Si no identificas un componente, marca "identified": false y usa valores conservadores.
+- En cada filtro/campo se honesto sobre limitaciones reales del hardware.`;
+
+function buildConsoleContext(request: ConsoleProfileRequest): string {
+  const c = request.systemInfo.cpu;
+  const g = request.systemInfo.gpu;
+  const realCaps = request.captureMaxResolution
+    ? `\nIMPORTANTE: OBS leyo las capacidades REALES de la capturadora: captura hasta ${request.captureMaxResolution}${request.captureMaxFps ? ` a ${request.captureMaxFps}fps` : ''}. Usa esto como techo de captura verificado (no lo superes); este dato es mas confiable que el nombre.`
+    : '';
+  return `Consola: ${CONSOLE_LABELS[request.console] ?? request.console}.
+Capturadora detectada: "${request.captureCard ?? 'desconocida'}".
+Monitor detectado: "${request.monitor ?? 'desconocido'}"${request.monitorRefreshRate ? ` a ${request.monitorRefreshRate}Hz` : ''}.
+PC que corre OBS: CPU ${c.model} (${c.cores} nucleos), GPU ${g.model} (vendor ${g.vendor}, NVENC ${g.hasNvenc ? 'si' : 'no'}), ${request.systemInfo.ram.total}GB RAM, OS ${request.os ?? request.systemInfo.os.distro}.
+Uso: ${request.mode} en ${request.platform}.${realCaps}`;
+}
+
+// Hibrido (mismo criterio que el perfil de microfono): web opcional via
+// GROQ_SEARCH_MODEL, por defecto conocimiento del modelo (gpt-oss).
+export async function getConsoleProfileFromGroq(request: ConsoleProfileRequest): Promise<unknown> {
+  const searchModel = process.env.GROQ_SEARCH_MODEL;
+
+  if (searchModel) {
+    try {
+      const webPrompt = `Eres un experto en streaming de consolas con OBS. Busca en la web las especificaciones OFICIALES de la consola, la capturadora y el monitor indicados, y haz "match" de la cadena consola -> capturadora -> monitor.
+${buildConsoleContext(request)}
+
+${CONSOLE_PROFILE_RULES}
+- Incluye "sources" con 1-3 URLs oficiales que respalden las specs.
+
+${CONSOLE_PROFILE_JSON_SHAPE}`;
+
+      const response = await chat(
+        [
+          { role: 'system', content: 'Eres un experto en streaming de consolas con OBS. Usas busqueda web para confirmar specs y respondes solo en JSON valido.' },
+          { role: 'user', content: webPrompt },
+        ],
+        { model: searchModel, temperature: 0.3, maxTokens: null },
+      );
+      return parseJsonObject(response);
+    } catch (error) {
+      console.warn('Busqueda web no disponible para el perfil de consola, usando conocimiento del modelo:', error instanceof Error ? error.message : error);
+    }
+  }
+
+  const knowledgePrompt = `Eres un experto en streaming de consolas con OBS. A partir de tu conocimiento de la consola, la capturadora y el monitor indicados, haz "match" de la cadena consola -> capturadora -> monitor.
+${buildConsoleContext(request)}
+
+${CONSOLE_PROFILE_RULES}
+- No inventes URLs: deja "sources" como [].
+
+${CONSOLE_PROFILE_JSON_SHAPE}`;
+
+  const response = await chat(
+    [
+      { role: 'system', content: 'Eres un experto en streaming de consolas con OBS. Respondes solo en JSON valido.' },
+      { role: 'user', content: knowledgePrompt },
+    ],
+    { model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b', temperature: 0.3, maxTokens: 2500 },
   );
 
   return parseJsonObject(response);

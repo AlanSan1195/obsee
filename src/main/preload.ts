@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AIRecommendationExplanationRequest, AIRecommendationRequest, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, CreateGuidedSourceConfig, MicProfileRequest, OBSAudioConfig, OBSConfig, OBSConnectionSettings, SetCameraLayoutInput } from '../shared/types';
+import type { AIRecommendationExplanationRequest, AIRecommendationRequest, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, ConsoleProfileRequest, CreateGuidedSourceConfig, MicProfileRequest, OBSAudioConfig, OBSConfig, OBSConnectionSettings, SetCameraLayoutInput } from '../shared/types';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   obs: {
@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     renameSource: (arg: { inputName: string; newInputName: string }) => ipcRenderer.invoke('obs:rename-source', arg),
     setSourceEnabled: (arg: { sceneName: string; sceneItemId: number; enabled: boolean }) => ipcRenderer.invoke('obs:set-source-enabled', arg),
     sourceScreenshot: (arg: { sourceName: string; maxWidth?: number }) => ipcRenderer.invoke('obs:source-screenshot', arg),
+    getCaptureCapabilities: (arg: { deviceName?: string }) => ipcRenderer.invoke('obs:get-capture-capabilities', arg),
     pickImageFile: () => ipcRenderer.invoke('obs:pick-image-file'),
     onConnectionChanged: (callback: (status: { connected: boolean; message: string }) => void) => {
       const listener = (
@@ -41,10 +42,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   system: {
     getInfo: () => ipcRenderer.invoke('system:get-info'),
+    getPeripherals: () => ipcRenderer.invoke('system:get-peripherals'),
   },
   ai: {
     getRecommendation: (request: AIRecommendationRequest) => ipcRenderer.invoke('ai:get-recommendation', request),
     explainRecommendation: (request: AIRecommendationExplanationRequest) => ipcRenderer.invoke('ai:explain-recommendation', request),
     profileMicrophone: (request: MicProfileRequest) => ipcRenderer.invoke('ai:profile-microphone', request),
+    profileConsole: (request: ConsoleProfileRequest) => ipcRenderer.invoke('ai:profile-console', request),
   },
 });

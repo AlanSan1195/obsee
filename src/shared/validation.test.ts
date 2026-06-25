@@ -6,6 +6,8 @@ import {
   validateAIRecommendationRequest,
   validateApplyGuidedSourceDevice,
   validateBeginGuidedSource,
+  validateConsoleProfileRequest,
+  validateConsoleProfileResponse,
   validateCreateGuidedSourceConfig,
   validateMicProfileRequest,
   validateMicProfileResponse,
@@ -597,5 +599,76 @@ describe('validateMicProfileResponse', () => {
 
   it('rechaza una respuesta sin perfil o filtros', () => {
     expect(validateMicProfileResponse({ source: 'ai', reasoning: 'x' }).success).toBe(false);
+  });
+});
+
+const validConsoleSystemInfo = {
+  cpu: { model: 'AMD Ryzen 7', cores: 8, speed: 3.8 },
+  gpu: { model: 'NVIDIA RTX 4070', vram: 12288, vendor: 'NVIDIA', hasNvenc: true },
+  ram: { total: 32 },
+  os: { platform: 'win32', distro: 'Windows', release: '11' },
+};
+
+describe('validateConsoleProfileRequest', () => {
+  it('acepta una solicitud valida', () => {
+    const result = validateConsoleProfileRequest({
+      console: 'ps5', platform: 'twitch', mode: 'stream_record', systemInfo: validConsoleSystemInfo,
+      captureCard: ' Elgato HD60 X ', monitor: ' LG 4K ', monitorRefreshRate: 120,
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.value.console).toBe('ps5');
+    expect(result.value.captureCard).toBe('Elgato HD60 X');
+    expect(result.value.monitorRefreshRate).toBe(120);
+  });
+
+  it('rechaza consola invalida o systemInfo incompleto', () => {
+    expect(validateConsoleProfileRequest({ console: 'ps6', platform: 'twitch', mode: 'stream_record', systemInfo: validConsoleSystemInfo }).success).toBe(false);
+    expect(validateConsoleProfileRequest({ console: 'ps5', platform: 'twitch', mode: 'stream_record', systemInfo: {} }).success).toBe(false);
+  });
+});
+
+describe('validateConsoleProfileResponse', () => {
+  const validResponse = {
+    source: 'ai',
+    profile: {
+      console: { name: 'PS5', identified: true, summary: '', maxResolution: '3840x2160', maxFps: 120, hdr: true, vrr: true },
+      captureCard: { name: 'UGREEN', identified: true, summary: '', maxResolution: '1920x1080', maxFps: 30 },
+      monitor: { name: 'LG 4K', identified: true, summary: '', maxResolution: '3840x2160', maxFps: 60 },
+      bottleneck: 'La capturadora limita',
+      captureResolution: '1920x1080',
+      captureFps: 30,
+      consoleSettings: ['paso 1', 'paso 2'],
+      sources: ['https://www.playstation.com'],
+    },
+    recommendations: {
+      resolution: '1920x1080', fps: 30, encoder: 'nvenc', bitrate: 6000, audio_bitrate: 320, recording_format: 'mkv', recording_quality: 'high',
+    },
+    reasoning: 'resumen',
+  };
+
+  it('acepta una respuesta valida y reusa la validacion de recommendations', () => {
+    const result = validateConsoleProfileResponse(validResponse);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.value.profile.captureResolution).toBe('1920x1080');
+    expect(result.value.recommendations.fps).toBe(30);
+  });
+
+  it('clampa specs fuera de rango y aplica defaults', () => {
+    const result = validateConsoleProfileResponse({
+      ...validResponse,
+      profile: { ...validResponse.profile, captureFps: 9999, captureResolution: 'no-valida', consoleSettings: 'x' },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.value.profile.captureFps).toBe(240);
+    expect(result.value.profile.captureResolution).toBe('1920x1080');
+    expect(result.value.profile.consoleSettings).toEqual([]);
+  });
+
+  it('rechaza si recommendations es invalido', () => {
+    const result = validateConsoleProfileResponse({ ...validResponse, recommendations: { ...validResponse.recommendations, resolution: 'mala' } });
+    expect(result.success).toBe(false);
   });
 });

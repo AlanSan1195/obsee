@@ -2,14 +2,16 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'path';
 import { obsManager } from './obs-manager';
 import dotenv from 'dotenv';
-import type { AIRecommendationExplanationRequest, AIRecommendationRequest, MicProfileRequest } from '../shared/types';
+import type { AIRecommendationExplanationRequest, AIRecommendationRequest, ConsoleProfileRequest, MicProfileRequest, PeripheralsSnapshot } from '../shared/types';
 import { getLocalRecommendation, getLocalRecommendationExplanation } from '../shared/localRecommendation';
 import { getLocalMicProfile } from '../shared/localMicProfile';
+import { getLocalConsoleProfile } from '../shared/localConsoleProfile';
 import {
   validateAIRecommendationExplanationRequest,
   validateAIRecommendationRequest,
   validateApplyGuidedSourceDevice,
   validateBeginGuidedSource,
+  validateConsoleProfileRequest,
   validateCreateGuidedSourceConfig,
   validateInputName,
   validateMicProfileRequest,
@@ -20,7 +22,7 @@ import {
   validateSetCameraLayout,
 } from '../shared/validation';
 import { loadBackup } from './backup-store';
-import { getRemoteAIUserMessage, getRemoteMicProfile, getRemoteRecommendation, getRemoteRecommendationExplanation } from './ai/remote';
+import { getRemoteAIUserMessage, getRemoteConsoleProfile, getRemoteMicProfile, getRemoteRecommendation, getRemoteRecommendationExplanation } from './ai/remote';
 
 dotenv.config();
 
@@ -281,6 +283,11 @@ ipcMain.handle('obs:source-screenshot', async (_, arg: unknown) => {
   return obsManager.getSourceScreenshot(sourceName, typeof maxWidth === 'number' ? maxWidth : undefined);
 });
 
+ipcMain.handle('obs:get-capture-capabilities', async (_, arg: unknown) => {
+  const deviceName = typeof arg === 'object' && arg !== null ? (arg as { deviceName?: unknown }).deviceName : undefined;
+  return obsManager.getCaptureCapabilities(typeof deviceName === 'string' ? deviceName : undefined);
+});
+
 ipcMain.handle('obs:pick-image-file', async () => {
   if (!mainWindow) {
     return { canceled: true, filePath: undefined };
@@ -328,6 +335,32 @@ ipcMain.handle('system:get-info', async () => {
   };
 });
 
+const CAPTURE_KEYWORDS = ['capture', 'hdmi', 'elgato', 'avermedia', 'ripsaw', 'ugreen', 'macrosilicon', 'cam link', 'live gamer', 'game capture', 'video grabber'];
+
+ipcMain.handle('system:get-peripherals', async (): Promise<PeripheralsSnapshot> => {
+  const si = await import('systeminformation');
+  const [graphics, usb] = await Promise.all([
+    si.graphics(),
+    si.usb().catch(() => []),
+  ]);
+
+  const displays = (graphics.displays ?? [])
+    .map((display) => ({
+      model: (display.model || 'Monitor').trim(),
+      main: Boolean(display.main),
+      width: typeof display.resolutionX === 'number' ? display.resolutionX : 0,
+      height: typeof display.resolutionY === 'number' ? display.resolutionY : 0,
+      refreshRate: typeof display.currentRefreshRate === 'number' ? display.currentRefreshRate : 0,
+    }))
+    .filter((display) => display.model.length > 0);
+
+  const captureDevices = (usb ?? [])
+    .map((device) => ({ name: (device.name || '').trim(), vendor: device.vendor || undefined }))
+    .filter((device) => device.name.length > 0 && CAPTURE_KEYWORDS.some((keyword) => device.name.toLowerCase().includes(keyword)));
+
+  return { displays, captureDevices };
+});
+
 ipcMain.handle('ai:get-recommendation', async (_, rawRequest: unknown) => {
   const validation = validateAIRecommendationRequest(rawRequest);
   if (!validation.success) {
@@ -359,6 +392,25 @@ ipcMain.handle('ai:profile-microphone', async (_, rawRequest: unknown) => {
   } catch (error) {
     console.error('Error profiling microphone with integrated AI:', error);
     const localProfile = getLocalMicProfile(request);
+    return {
+      ...localProfile,
+      reasoning: `${localProfile.reasoning} IA integrada no disponible: ${getRemoteAIUserMessage(error)}`,
+    };
+  }
+});
+
+ipcMain.handle('ai:profile-console', async (_, rawRequest: unknown) => {
+  const validation = validateConsoleProfileRequest(rawRequest);
+  if (!validation.success) {
+    throw new Error(validation.message);
+  }
+
+  const request: ConsoleProfileRequest = { ...validation.value, os: process.platform };
+  try {
+    return await getRemoteConsoleProfile(request);
+  } catch (error) {
+    console.error('Error profiling console with integrated AI:', error);
+    const localProfile = getLocalConsoleProfile(request);
     return {
       ...localProfile,
       reasoning: `${localProfile.reasoning} IA integrada no disponible: ${getRemoteAIUserMessage(error)}`,

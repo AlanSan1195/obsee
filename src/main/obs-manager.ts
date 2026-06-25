@@ -2,6 +2,7 @@ import OBSWebSocket from 'obs-websocket-js';
 import type {
   ApplyGuidedSourceDeviceInput,
   BeginGuidedSourceResult,
+  CaptureCapabilities,
   CreateGuidedSourceConfig,
   DeviceOption,
   OBSAudioConfig,
@@ -55,6 +56,21 @@ const defaultConnectionSettings: OBSConnectionSettings = {
   port: 4455,
   password: '',
 };
+
+// Parsea items de resolucion que OBS devuelve para una capturadora ("1920x1080",
+// "1920x1080 @ 60fps", etc.). Devuelve resolucion normalizada + fps si viene.
+function parseCaptureResString(value: string): { res: string; pixels: number; fps?: number } | null {
+  const match = /(\d{3,4})\s*[x×]\s*(\d{3,4})/.exec(value);
+  if (!match) return null;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  const fpsMatch = /@?\s*(\d+(?:\.\d+)?)\s*(?:fps|hz)/i.exec(value);
+  return {
+    res: `${width}x${height}`,
+    pixels: width * height,
+    fps: fpsMatch ? Math.round(Number(fpsMatch[1])) : undefined,
+  };
+}
 
 type AudioInputCandidate = {
   name: string;
@@ -962,6 +978,117 @@ export class OBSManager {
     }
 
     return { devices: [] };
+  }
+
+  // Lee la lista de resoluciones que una capturadora realmente expone (no las
+  // adivina por nombre). Prueba 'preset' (macOS) y 'resolution' (Windows/dshow).
+  private async readResolutionItems(inputName: string): Promise<string[]> {
+    for (const propertyName of ['preset', 'resolution']) {
+      try {
+        const response = await this.callWithTimeout(
+          this.obs.call('GetInputPropertiesListPropertyItems', { inputName, propertyName }),
+        );
+        const items = response.propertyItems
+          .filter(isRecord)
+          .map((item) => getStringValue(item, ['itemName', 'name']))
+          .filter((name) => name.length > 0);
+        if (items.length > 0) return items;
+      } catch {
+        // Probar la siguiente propiedad; varia por plataforma/kind.
+      }
+    }
+    return [];
+  }
+
+  // Lee las capacidades REALES de la capturadora desde OBS: crea un input temporal
+  // de captura de video, selecciona el dispositivo que coincide con el nombre, lee
+  // sus resoluciones soportadas y lo elimina. Asi el "match" de consola usa el
+  // techo de captura verificado en vez de adivinar por el nombre del USB.
+  async getCaptureCapabilities(deviceNameFilter?: string): Promise<{ success: boolean; message: string; capabilities?: CaptureCapabilities }> {
+    if (!this.connected) return this.notConnected();
+
+    let tempInputName: string | undefined;
+    try {
+      const kindsResponse = await this.obs.call('GetInputKindList');
+      const kinds = (kindsResponse.inputKinds ?? []).filter((kind): kind is string => typeof kind === 'string');
+      const resolved = resolveSourceKind('camera', kinds);
+      if (!resolved.available) {
+        return { success: false, message: 'OBS no expone captura de video en este sistema.' };
+      }
+
+      const sceneList = await this.obs.call('GetSceneList');
+      const sceneName = getOptionalString(sceneList.currentProgramSceneName)
+        ?? (sceneList.scenes ?? []).filter(isRecord).map((scene) => getStringValue(scene, ['sceneName', 'name'])).find((name) => name.length > 0);
+      if (!sceneName) {
+        return { success: false, message: 'Crea al menos una escena en OBS antes de leer la capturadora.' };
+      }
+
+      const existing = await this.getExistingInputNames();
+      tempInputName = buildUniqueInputName('obsee captura temporal', existing);
+      await this.obs.call('CreateInput', {
+        sceneName,
+        inputName: tempInputName,
+        inputKind: resolved.inputKind,
+        sceneItemEnabled: false,
+      });
+
+      const { devices, propertyName } = await this.getVideoDevicesForInput(tempInputName, DEVICE_PROPERTY_CANDIDATES.camera ?? []);
+      const filter = (deviceNameFilter ?? '').toLowerCase().trim();
+      const chosen = (filter
+        ? devices.find((device) => device.name.toLowerCase().includes(filter) || filter.includes(device.name.toLowerCase()))
+        : undefined)
+        ?? devices.find((device) => /capture|hdmi|elgato|avermedia|ugreen|macro|cam link|live gamer|ripsaw/i.test(device.name))
+        ?? devices[0];
+
+      if (!chosen) {
+        return { success: false, message: 'No se encontro una capturadora de video en OBS.' };
+      }
+
+      if (propertyName) {
+        await this.obs.call('SetInputSettings', {
+          inputName: tempInputName,
+          // Cubrir macOS (device/uid) y Windows (video_device_id); OBS ignora las que no apliquen.
+          inputSettings: { [propertyName]: chosen.id, uid: chosen.id, video_device_id: chosen.id, use_preset: true },
+          overlay: true,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 900));
+      }
+
+      const parsed = this.dedupeCaptureResolutions(await this.readResolutionItems(tempInputName));
+      const maxRes = parsed.reduce<{ res: string; pixels: number } | undefined>((best, item) => (
+        !best || item.pixels > best.pixels ? item : best
+      ), undefined);
+      const fpsValues = parsed.map((item) => item.fps).filter((fps): fps is number => typeof fps === 'number');
+
+      return {
+        success: true,
+        message: maxRes ? `Capturadora: hasta ${maxRes.res}` : 'No se pudo leer la resolucion de la capturadora',
+        capabilities: {
+          deviceName: chosen.name,
+          maxResolution: maxRes?.res,
+          maxFps: fpsValues.length > 0 ? Math.max(...fpsValues) : undefined,
+          resolutions: parsed.map((item) => item.res),
+        },
+      };
+    } catch (error) {
+      return { success: false, message: `No se pudo leer la capturadora: ${OBSManager.describeError(error)}` };
+    } finally {
+      if (tempInputName) {
+        try { await this.obs.call('RemoveInput', { inputName: tempInputName }); } catch { /* limpieza best-effort */ }
+      }
+    }
+  }
+
+  private dedupeCaptureResolutions(items: string[]): { res: string; pixels: number; fps?: number }[] {
+    const seen = new Set<string>();
+    const result: { res: string; pixels: number; fps?: number }[] = [];
+    for (const item of items) {
+      const parsed = parseCaptureResString(item);
+      if (!parsed || seen.has(parsed.res)) continue;
+      seen.add(parsed.res);
+      result.push(parsed);
+    }
+    return result;
   }
 
   // Encaja un elemento al canvas completo (equivalente a "Ajustar a pantalla"),

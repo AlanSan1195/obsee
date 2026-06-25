@@ -21,8 +21,13 @@ function getSelectedDevice(devices: OBSAudioDevice[], selectedDeviceId?: string)
 }
 
 function getDefaultDeviceId(devices: OBSAudioDevice[], currentDeviceId?: string): string {
+  // Respetar el dispositivo que OBS ya tiene seleccionado; el "recomendado" solo
+  // es una sugerencia para cuando no hay nada elegido todavia.
+  if (currentDeviceId && devices.some((device) => device.id === currentDeviceId)) {
+    return currentDeviceId;
+  }
   const recommended = devices.find((device) => device.isRecommended);
-  return recommended?.id ?? currentDeviceId ?? devices[0]?.id ?? '';
+  return recommended?.id ?? devices[0]?.id ?? '';
 }
 
 export function createDefaultAudioConfig(inputName: string, device?: OBSAudioDevice): OBSAudioConfig {
@@ -119,7 +124,13 @@ export function AudioConfiguration() {
 
   useEffect(() => {
     if (obsAudioSnapshot) {
-      setSelectedDeviceId(getDefaultDeviceId(obsAudioSnapshot.devices, obsAudioSnapshot.selectedDeviceId));
+      // No pisar la eleccion manual del usuario: si su seleccion sigue existiendo
+      // entre los dispositivos (p. ej. tras refrescar al aplicar), se conserva.
+      setSelectedDeviceId((prev) =>
+        prev && obsAudioSnapshot.devices.some((device) => device.id === prev)
+          ? prev
+          : getDefaultDeviceId(obsAudioSnapshot.devices, obsAudioSnapshot.selectedDeviceId),
+      );
       setMonitorType(obsAudioSnapshot.monitorType as OBSAudioConfig['monitorType']);
       setSyncOffsetMs(obsAudioSnapshot.syncOffsetMs);
       const defaultDuckingTarget = obsAudioSnapshot.duckingTargets.find((target) => target.duckingConfigured)

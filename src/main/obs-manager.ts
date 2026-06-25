@@ -1,5 +1,9 @@
 import OBSWebSocket from 'obs-websocket-js';
 import type {
+  ApplyGuidedSourceDeviceInput,
+  BeginGuidedSourceResult,
+  CreateGuidedSourceConfig,
+  DeviceOption,
   OBSAudioConfig,
   OBSAudioDevice,
   OBSAudioFilterSnapshot,
@@ -7,6 +11,11 @@ import type {
   OBSConfig,
   OBSConnectionSettings,
   OBSSettingsSnapshot,
+  Scene,
+  SceneItemSummary,
+  SceneSourcesSnapshot,
+  ScenesSnapshot,
+  SourceKindFriendly,
 } from '../shared/types';
 import { parseResolution } from '../shared/validation';
 import {
@@ -29,6 +38,15 @@ import {
   scoreAudioInput,
   type OBSJsonSettings,
 } from './obs-helpers';
+import {
+  DEVICE_PROPERTY_CANDIDATES,
+  ENUM_UNSAFE_KINDS,
+  FRIENDLY_LABELS,
+  buildUniqueInputName,
+  friendlyKindFromInputKind,
+  resolveAllSourceKinds,
+  resolveSourceKind,
+} from './scene-helpers';
 import { saveBackup } from './backup-store';
 
 const defaultConnectionSettings: OBSConnectionSettings = {
@@ -100,12 +118,19 @@ export class OBSManager {
       this.emitStatus('Conectado a OBS');
       return { success: true, message: 'Conectado a OBS' };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const lowerErrorMessage = errorMessage.toLowerCase();
+      const rawMessage = error instanceof Error ? error.message : '';
+      const errorCode = typeof (error as { code?: unknown })?.code === 'number' ? (error as { code: number }).code : undefined;
+      const lowerErrorMessage = rawMessage.toLowerCase();
       let helpMessage = 'Revisa que OBS este abierto, que el servidor WebSocket este habilitado, que el puerto coincida con OBS y que el password solo se use si OBS tiene autenticacion activada.';
+      // Cierre abnormal (codigo 1006) o error sin mensaje: casi siempre OBS no esta
+      // abierto o el servidor WebSocket esta apagado / no responde en ese puerto.
+      let reason = rawMessage.trim().length > 0 ? rawMessage : 'OBS no respondio';
 
       if (lowerErrorMessage.includes('authentication failed') || lowerErrorMessage.includes('authentication')) {
         helpMessage = 'OBS requiere password o rechazo el password enviado. Si desactivaste la autenticacion, pulsa Aplicar/Aceptar en OBS y reinicia OBS; si sigue activada, copia el password actual.';
+      } else if (errorCode === 1006 || rawMessage.trim().length === 0) {
+        reason = 'OBS no esta abierto o el servidor WebSocket esta apagado';
+        helpMessage = `Abre OBS y activa Herramientas -> Configuracion de WebSocket -> "Habilitar servidor WebSocket" (puerto ${connectionSettings.port}). Si tiene password, escribelo aqui; si no, deja el campo vacio.`;
       } else if (lowerErrorMessage.includes('econnrefused') || lowerErrorMessage.includes('connection refused')) {
         helpMessage = `OBS no acepto la conexion. Revisa que OBS este abierto, que el servidor WebSocket este activado y que el puerto sea ${connectionSettings.port}.`;
       } else if (lowerErrorMessage.includes('closed') || lowerErrorMessage.includes('close') || lowerErrorMessage.includes('socket hang up')) {
@@ -114,7 +139,7 @@ export class OBSManager {
 
       return {
         success: false,
-        message: `No se pudo conectar con OBS WebSocket en ${address}: ${errorMessage}. ${helpMessage}`,
+        message: `No se pudo conectar con OBS WebSocket en ${address}: ${reason}. ${helpMessage}`,
       };
     }
   }
@@ -743,6 +768,514 @@ export class OBSManager {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         warnings.push(`${filterName}: ${errorMessage}`);
       }
+    }
+  }
+
+  // --- Escenas y fuentes guiadas ---
+
+  private notConnected(): { success: false; message: string } {
+    return { success: false, message: 'Conectate a OBS primero para administrar escenas y fuentes.' };
+  }
+
+  private static describeError(error: unknown): string {
+    return error instanceof Error ? error.message : 'Error desconocido';
+  }
+
+  async getScenesSnapshot(): Promise<{ success: boolean; message: string; snapshot?: ScenesSnapshot }> {
+    if (!this.connected) return this.notConnected();
+
+    try {
+      const response = await this.obs.call('GetSceneList');
+      const currentProgramSceneName = getOptionalString(response.currentProgramSceneName);
+      const scenes: Scene[] = response.scenes
+        .filter(isRecord)
+        .map((scene) => {
+          const sceneName = getStringValue(scene, ['sceneName', 'name']);
+          return {
+            sceneName,
+            sceneUuid: getOptionalString(scene.sceneUuid),
+            sceneIndex: typeof scene.sceneIndex === 'number' ? scene.sceneIndex : 0,
+            isCurrentProgramScene: sceneName === currentProgramSceneName,
+          };
+        })
+        .filter((scene) => scene.sceneName.length > 0)
+        .sort((a, b) => a.sceneIndex - b.sceneIndex);
+
+      return {
+        success: true,
+        message: 'Escenas cargadas',
+        snapshot: { scenes, currentProgramSceneName, warnings: [] },
+      };
+    } catch (error) {
+      return { success: false, message: `No se pudieron leer las escenas: ${OBSManager.describeError(error)}` };
+    }
+  }
+
+  async createScene(sceneName: string): Promise<{ success: boolean; message: string; snapshot?: ScenesSnapshot }> {
+    if (!this.connected) return this.notConnected();
+
+    try {
+      await this.obs.call('CreateScene', { sceneName });
+      await this.obs.call('SetCurrentProgramScene', { sceneName }).catch(() => undefined);
+      const snapshot = await this.getScenesSnapshot();
+      return { success: true, message: `Escena "${sceneName}" creada`, snapshot: snapshot.snapshot };
+    } catch (error) {
+      return { success: false, message: `No se pudo crear la escena: ${OBSManager.describeError(error)}` };
+    }
+  }
+
+  async setCurrentScene(sceneName: string): Promise<{ success: boolean; message: string }> {
+    if (!this.connected) return this.notConnected();
+
+    try {
+      await this.obs.call('SetCurrentProgramScene', { sceneName });
+      return { success: true, message: `Escena activa: "${sceneName}"` };
+    } catch (error) {
+      return { success: false, message: `No se pudo cambiar de escena: ${OBSManager.describeError(error)}` };
+    }
+  }
+
+  async removeScene(sceneName: string): Promise<{ success: boolean; message: string; snapshot?: ScenesSnapshot }> {
+    if (!this.connected) return this.notConnected();
+
+    try {
+      await this.obs.call('RemoveScene', { sceneName });
+      const snapshot = await this.getScenesSnapshot();
+      return { success: true, message: `Escena "${sceneName}" eliminada`, snapshot: snapshot.snapshot };
+    } catch (error) {
+      return { success: false, message: `No se pudo eliminar la escena: ${OBSManager.describeError(error)}` };
+    }
+  }
+
+  async getAvailableSourceKinds(): Promise<{ success: boolean; message: string; resolved?: ReturnType<typeof resolveAllSourceKinds> }> {
+    if (!this.connected) return this.notConnected();
+
+    try {
+      const response = await this.obs.call('GetInputKindList');
+      const kinds = (response.inputKinds ?? []).filter((kind): kind is string => typeof kind === 'string');
+      return { success: true, message: 'Tipos de fuente detectados', resolved: resolveAllSourceKinds(kinds) };
+    } catch (error) {
+      return { success: false, message: `No se pudieron leer los tipos de fuente: ${OBSManager.describeError(error)}` };
+    }
+  }
+
+  async getSceneSources(sceneName: string): Promise<{ success: boolean; message: string; snapshot?: SceneSourcesSnapshot }> {
+    if (!this.connected) return this.notConnected();
+
+    try {
+      const response = await this.obs.call('GetSceneItemList', { sceneName });
+      const items: SceneItemSummary[] = response.sceneItems
+        .filter(isRecord)
+        .map((item) => {
+          const inputKind = getOptionalString(item.inputKind) ?? getOptionalString(item.sourceKind);
+          return {
+            sceneItemId: typeof item.sceneItemId === 'number' ? item.sceneItemId : 0,
+            sourceName: getStringValue(item, ['sourceName', 'name']),
+            inputKind,
+            friendlyKind: friendlyKindFromInputKind(inputKind),
+            enabled: item.sceneItemEnabled !== false,
+          };
+        })
+        .filter((item) => item.sourceName.length > 0);
+
+      return { success: true, message: 'Fuentes cargadas', snapshot: { sceneName, items, warnings: [] } };
+    } catch (error) {
+      return { success: false, message: `No se pudieron leer las fuentes: ${OBSManager.describeError(error)}` };
+    }
+  }
+
+  private async getExistingInputNames(): Promise<string[]> {
+    try {
+      const response = await this.obs.call('GetInputList');
+      return (response.inputs ?? [])
+        .filter(isRecord)
+        .map((input) => getStringValue(input, ['inputName', 'name']))
+        .filter((name) => name.length > 0);
+    } catch {
+      return [];
+    }
+  }
+
+  // Algunas propiedades de OBS (p.ej. screen_capture en macOS) nunca responden y
+  // cierran el WebSocket. Limitamos la espera para no colgar el asistente.
+  private async callWithTimeout<T>(promise: Promise<T>, ms = 4000): Promise<T> {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('La consulta a OBS tardo demasiado')), ms);
+    });
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      clearTimeout(timer!);
+    }
+  }
+
+  // Enumera dispositivos/monitores/ventanas de un input ya creado, probando varias
+  // propiedades hasta que OBS devuelva items (replica getAudioDevices para video).
+  private async getVideoDevicesForInput(
+    inputName: string,
+    propertyCandidates: string[],
+  ): Promise<{ devices: DeviceOption[]; propertyName?: string }> {
+    for (const propertyName of propertyCandidates) {
+      try {
+        const response = await this.callWithTimeout(
+          this.obs.call('GetInputPropertiesListPropertyItems', { inputName, propertyName }),
+        );
+        const seen = new Set<string>();
+        const devices = response.propertyItems
+          .filter(isRecord)
+          .map((item) => {
+            const id = getStringValue(item, ['itemValue', 'value', 'id']);
+            const name = getStringValue(item, ['itemName', 'name', 'description', 'label']) || id || 'Dispositivo';
+            return { id, name, isDefault: `${name} ${id}`.toLowerCase().includes('default') };
+          })
+          // Descartar items sin valor seleccionable y duplicados (OBS a veces
+          // devuelve un item vacio o entradas repetidas, p.ej. en ventanas).
+          .filter((device) => {
+            if (device.id.length === 0) return false;
+            if (seen.has(device.id)) return false;
+            seen.add(device.id);
+            return true;
+          });
+
+        if (devices.length > 0) return { devices, propertyName };
+      } catch {
+        // Probar la siguiente propiedad; los nombres varian por plataforma/kind.
+      }
+    }
+
+    return { devices: [] };
+  }
+
+  // Encaja un elemento al canvas completo (equivalente a "Ajustar a pantalla"),
+  // sin que el usuario tenga que tocar transformaciones.
+  private async fitSceneItemToCanvas(sceneName: string, sceneItemId: number, warnings: string[]): Promise<void> {
+    try {
+      const video = await this.obs.call('GetVideoSettings');
+      const baseWidth = video.baseWidth || 1920;
+      const baseHeight = video.baseHeight || 1080;
+      await this.obs.call('SetSceneItemTransform', {
+        sceneName,
+        sceneItemId,
+        sceneItemTransform: {
+          positionX: 0,
+          positionY: 0,
+          boundsType: 'OBS_BOUNDS_SCALE_INNER',
+          boundsWidth: baseWidth,
+          boundsHeight: baseHeight,
+          boundsAlignment: 0,
+          alignment: 5,
+        },
+      });
+    } catch (error) {
+      warnings.push(`No se pudo ajustar la fuente al lienzo: ${OBSManager.describeError(error)}`);
+    }
+  }
+
+  // Crea el input dentro de la escena y, si aplica, enumera los dispositivos para
+  // que el usuario elija. OBS preselecciona uno por defecto, asi que la fuente ya
+  // se ve de inmediato (permite preview real). Si el usuario cancela, se limpia
+  // con cancelGuidedSource.
+  async beginGuidedSource(sceneName: string, friendly: SourceKindFriendly): Promise<BeginGuidedSourceResult> {
+    if (!this.connected) return { ...this.notConnected(), warnings: [] };
+
+    const warnings: string[] = [];
+
+    try {
+      const kindsResponse = await this.obs.call('GetInputKindList');
+      const kinds = (kindsResponse.inputKinds ?? []).filter((kind): kind is string => typeof kind === 'string');
+      const resolved = resolveSourceKind(friendly, kinds);
+
+      if (!resolved.available) {
+        return {
+          success: false,
+          message: `Tu instalacion de OBS no incluye captura de "${FRIENDLY_LABELS[friendly]}" en este sistema.`,
+          warnings,
+        };
+      }
+
+      const existingNames = await this.getExistingInputNames();
+      const inputName = buildUniqueInputName(FRIENDLY_LABELS[friendly], existingNames);
+
+      const created = await this.obs.call('CreateInput', {
+        sceneName,
+        inputName,
+        inputKind: resolved.inputKind,
+      });
+      const sceneItemId = created.sceneItemId;
+
+      let devices: DeviceOption[] = [];
+      let propertyName = resolved.devicePropertyName;
+      if (resolved.supportsDeviceEnum && ENUM_UNSAFE_KINDS.has(resolved.inputKind)) {
+        // Este tipo de captura cuelga OBS al listar sus opciones: lo omitimos y
+        // dejamos el valor por defecto para no perder la conexion.
+        warnings.push('OBS usara el monitor principal para esta captura; podras cambiarlo desde OBS si lo necesitas.');
+      } else if (resolved.supportsDeviceEnum) {
+        const candidates = DEVICE_PROPERTY_CANDIDATES[friendly] ?? [];
+        const enumeration = await this.getVideoDevicesForInput(inputName, candidates);
+        devices = enumeration.devices;
+        propertyName = enumeration.propertyName ?? propertyName;
+        if (devices.length === 0) {
+          warnings.push('No se detectaron dispositivos. Verifica que esten conectados y que OBS tenga permisos.');
+        }
+      }
+
+      await this.fitSceneItemToCanvas(sceneName, sceneItemId, warnings);
+
+      return {
+        success: true,
+        message: `Fuente "${inputName}" agregada`,
+        inputName,
+        sceneItemId,
+        devices,
+        propertyName,
+        supportsDeviceEnum: resolved.supportsDeviceEnum,
+        warnings,
+      };
+    } catch (error) {
+      return { success: false, message: `No se pudo agregar la fuente: ${OBSManager.describeError(error)}`, warnings };
+    }
+  }
+
+  async applyGuidedSourceDevice(input: ApplyGuidedSourceDeviceInput): Promise<{ success: boolean; message: string; warnings: string[] }> {
+    if (!this.connected) return { ...this.notConnected(), warnings: [] };
+
+    const warnings: string[] = [];
+    try {
+      await this.obs.call('SetInputSettings', {
+        inputName: input.inputName,
+        inputSettings: { [input.propertyName]: input.deviceId },
+        overlay: true,
+      });
+      // El tamano real puede cambiar al elegir dispositivo: re-encajar al lienzo.
+      await this.fitSceneItemToCanvas(input.sceneName, input.sceneItemId, warnings);
+      return { success: true, message: 'Dispositivo seleccionado', warnings };
+    } catch (error) {
+      return { success: false, message: `No se pudo aplicar el dispositivo: ${OBSManager.describeError(error)}`, warnings };
+    }
+  }
+
+  async cancelGuidedSource(inputName: string): Promise<{ success: boolean; message: string }> {
+    if (!this.connected) return this.notConnected();
+    return this.removeInput(inputName);
+  }
+
+  async createGuidedSource(config: CreateGuidedSourceConfig): Promise<{ success: boolean; message: string; sceneItemId?: number; warnings: string[] }> {
+    if (!this.connected) return { ...this.notConnected(), warnings: [] };
+
+    const warnings: string[] = [];
+    try {
+      const kindsResponse = await this.obs.call('GetInputKindList');
+      const kinds = (kindsResponse.inputKinds ?? []).filter((kind): kind is string => typeof kind === 'string');
+      const resolved = resolveSourceKind(config.friendly, kinds);
+      if (!resolved.available) {
+        return {
+          success: false,
+          message: `Tu instalacion de OBS no incluye "${FRIENDLY_LABELS[config.friendly]}" en este sistema.`,
+          warnings,
+        };
+      }
+
+      const inputSettings: Record<string, string> = {};
+      if (config.friendly === 'image' && config.imagePath) {
+        inputSettings.file = config.imagePath;
+      } else if (config.deviceId && resolved.devicePropertyName) {
+        inputSettings[resolved.devicePropertyName] = config.deviceId;
+      }
+
+      const existingNames = await this.getExistingInputNames();
+      const inputName = buildUniqueInputName(config.sourceName || FRIENDLY_LABELS[config.friendly], existingNames);
+
+      const created = await this.obs.call('CreateInput', {
+        sceneName: config.sceneName,
+        inputName,
+        inputKind: resolved.inputKind,
+        inputSettings,
+      });
+
+      if (config.fitToCanvas) {
+        await this.fitSceneItemToCanvas(config.sceneName, created.sceneItemId, warnings);
+      }
+
+      return { success: true, message: `Fuente "${inputName}" agregada`, sceneItemId: created.sceneItemId, warnings };
+    } catch (error) {
+      return { success: false, message: `No se pudo agregar la fuente: ${OBSManager.describeError(error)}`, warnings };
+    }
+  }
+
+  async removeInput(inputName: string): Promise<{ success: boolean; message: string }> {
+    if (!this.connected) return this.notConnected();
+
+    try {
+      await this.obs.call('RemoveInput', { inputName });
+      return { success: true, message: `Fuente "${inputName}" eliminada` };
+    } catch (error) {
+      return { success: false, message: `No se pudo eliminar la fuente: ${OBSManager.describeError(error)}` };
+    }
+  }
+
+  // Lee el tamano real de la fuente de un elemento. La camara puede tardar en
+  // reportar dimensiones tras seleccionarla, asi que reintentamos unas veces.
+  private async getSceneItemSourceSize(sceneName: string, sceneItemId: number): Promise<{ width: number; height: number }> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await this.obs.call('GetSceneItemTransform', { sceneName, sceneItemId });
+        const transform = response.sceneItemTransform as Record<string, unknown>;
+        const width = typeof transform.sourceWidth === 'number' ? transform.sourceWidth : 0;
+        const height = typeof transform.sourceHeight === 'number' ? transform.sourceHeight : 0;
+        if (width > 0 && height > 0) return { width, height };
+      } catch {
+        // Reintentar.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    return { width: 0, height: 0 };
+  }
+
+  // Crea una escena nueva con la camara a pantalla completa, sin cambiar la escena
+  // activa. Se usa en "Ambas": el facecam queda en la escena actual y la camara
+  // completa se separa en su propia escena.
+  async createCameraScene(
+    desiredSceneName: string,
+    inputBaseName: string,
+    deviceId: string,
+    propertyName: string,
+  ): Promise<{ success: boolean; message: string; sceneName?: string; warnings: string[] }> {
+    if (!this.connected) return { ...this.notConnected(), warnings: [] };
+
+    const warnings: string[] = [];
+    try {
+      const kindsResponse = await this.obs.call('GetInputKindList');
+      const kinds = (kindsResponse.inputKinds ?? []).filter((kind): kind is string => typeof kind === 'string');
+      const resolved = resolveSourceKind('camera', kinds);
+      if (!resolved.available) {
+        return { success: false, message: 'Tu instalacion de OBS no incluye captura de camara en este sistema.', warnings };
+      }
+
+      // En OBS los nombres de escenas e inputs comparten espacio de nombres, asi
+      // que el nombre de la escena debe ser unico contra ambos.
+      const sceneList = await this.obs.call('GetSceneList');
+      const existingInputs = await this.getExistingInputNames();
+      const usedNames = [
+        ...sceneList.scenes.filter(isRecord).map((scene) => getStringValue(scene, ['sceneName', 'name'])),
+        ...existingInputs,
+      ].filter((name) => name.length > 0);
+
+      const sceneName = buildUniqueInputName(desiredSceneName, usedNames);
+      // CreateScene no cambia la escena en vivo, asi el usuario sigue en la suya.
+      await this.obs.call('CreateScene', { sceneName });
+
+      const inputName = buildUniqueInputName(inputBaseName, [...usedNames, sceneName]);
+      const created = await this.obs.call('CreateInput', { sceneName, inputName, inputKind: resolved.inputKind });
+
+      const prop = propertyName || resolved.devicePropertyName;
+      if (deviceId && prop) {
+        await this.obs.call('SetInputSettings', { inputName, inputSettings: { [prop]: deviceId }, overlay: true });
+      }
+      await this.fitSceneItemToCanvas(sceneName, created.sceneItemId, warnings);
+
+      return { success: true, message: `Escena "${sceneName}" creada con la camara completa`, sceneName, warnings };
+    } catch (error) {
+      return { success: false, message: `No se pudo crear la escena de camara: ${OBSManager.describeError(error)}`, warnings };
+    }
+  }
+
+  // Envia un elemento al fondo de la escena (indice 0) para que no tape a los demas.
+  async setSourceToBottom(sceneName: string, sceneItemId: number): Promise<{ success: boolean; message: string }> {
+    if (!this.connected) return this.notConnected();
+
+    try {
+      await this.obs.call('SetSceneItemIndex', { sceneName, sceneItemId, sceneItemIndex: 0 });
+      return { success: true, message: 'Fuente enviada al fondo' };
+    } catch (error) {
+      return { success: false, message: `No se pudo reordenar la fuente: ${OBSManager.describeError(error)}` };
+    }
+  }
+
+  async setCameraLayout(sceneName: string, sceneItemId: number, layout: 'facecam' | 'fullscreen'): Promise<{ success: boolean; message: string; warnings: string[] }> {
+    if (!this.connected) return { ...this.notConnected(), warnings: [] };
+
+    const warnings: string[] = [];
+    try {
+      if (layout === 'fullscreen') {
+        await this.fitSceneItemToCanvas(sceneName, sceneItemId, warnings);
+        return { success: true, message: 'Camara a pantalla completa', warnings };
+      }
+
+      // Facecam 1:1 en la esquina inferior derecha. Recortamos la camara a un
+      // cuadrado centrado (crop) y luego la escalamos con SCALE_INNER: asi queda
+      // un 1:1 exacto sin que la imagen se desborde del recuadro (SCALE_OUTER no
+      // recorta y la camara se salia por los lados).
+      const video = await this.obs.call('GetVideoSettings');
+      const baseWidth = video.baseWidth || 1920;
+      const baseHeight = video.baseHeight || 1080;
+      const { width: sourceWidth, height: sourceHeight } = await this.getSceneItemSourceSize(sceneName, sceneItemId);
+      const cropX = sourceWidth > sourceHeight ? Math.round((sourceWidth - sourceHeight) / 2) : 0;
+      const cropY = sourceHeight > sourceWidth ? Math.round((sourceHeight - sourceWidth) / 2) : 0;
+      const side = Math.round(baseHeight * 0.3);
+      const margin = Math.round(baseHeight * 0.04);
+      await this.obs.call('SetSceneItemTransform', {
+        sceneName,
+        sceneItemId,
+        sceneItemTransform: {
+          positionX: baseWidth - side - margin,
+          positionY: baseHeight - side - margin,
+          cropLeft: cropX,
+          cropRight: cropX,
+          cropTop: cropY,
+          cropBottom: cropY,
+          boundsType: 'OBS_BOUNDS_SCALE_INNER',
+          boundsWidth: side,
+          boundsHeight: side,
+          boundsAlignment: 0,
+          alignment: 5,
+        },
+      });
+      if (sourceWidth === 0 || sourceHeight === 0) {
+        warnings.push('La camara aun no reportaba su tamano; si el recorte no quedo 1:1, vuelve a elegir el formato.');
+      }
+      return { success: true, message: 'Camara en formato facecam 1:1', warnings };
+    } catch (error) {
+      return { success: false, message: `No se pudo ajustar la camara: ${OBSManager.describeError(error)}`, warnings };
+    }
+  }
+
+  async renameInput(inputName: string, newInputName: string): Promise<{ success: boolean; message: string }> {
+    if (!this.connected) return this.notConnected();
+    if (inputName === newInputName) return { success: true, message: 'Sin cambios' };
+
+    try {
+      await this.obs.call('SetInputName', { inputName, newInputName });
+      return { success: true, message: `Fuente renombrada a "${newInputName}"` };
+    } catch (error) {
+      return { success: false, message: `No se pudo renombrar la fuente: ${OBSManager.describeError(error)}` };
+    }
+  }
+
+  async setSceneItemEnabled(sceneName: string, sceneItemId: number, enabled: boolean): Promise<{ success: boolean; message: string }> {
+    if (!this.connected) return this.notConnected();
+
+    try {
+      await this.obs.call('SetSceneItemEnabled', { sceneName, sceneItemId, sceneItemEnabled: enabled });
+      return { success: true, message: enabled ? 'Fuente visible' : 'Fuente oculta' };
+    } catch (error) {
+      return { success: false, message: `No se pudo cambiar la visibilidad: ${OBSManager.describeError(error)}` };
+    }
+  }
+
+  async getSourceScreenshot(sourceName: string, maxWidth = 480): Promise<{ success: boolean; message: string; imageData?: string }> {
+    if (!this.connected) return this.notConnected();
+
+    try {
+      const response = await this.obs.call('GetSourceScreenshot', {
+        sourceName,
+        imageFormat: 'jpg',
+        imageWidth: maxWidth,
+        imageCompressionQuality: 50,
+      });
+      return { success: true, message: 'Captura lista', imageData: response.imageData };
+    } catch (error) {
+      return { success: false, message: `No se pudo capturar la vista previa: ${OBSManager.describeError(error)}` };
     }
   }
 }

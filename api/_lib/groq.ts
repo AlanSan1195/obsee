@@ -35,7 +35,18 @@ export function parseJsonObject(value: string): unknown {
 }
 
 export async function getRecommendationFromGroq(request: AIRecommendationRequest): Promise<unknown> {
-  const { systemInfo, mode, platform } = request;
+  const { systemInfo, mode, platform, currentSettings } = request;
+  const baselineSection = currentSettings
+    ? `
+Configuracion que OBS ya tiene (definida en el asistente inicial de OBS segun el hardware y la red del usuario; usala como base y solo cambiala si hay una mejora clara):
+- Resolucion: ${currentSettings.resolution}
+- FPS: ${currentSettings.fps}
+- Encoder: ${currentSettings.encoder}
+- Bitrate de video: ${currentSettings.bitrate} kbps
+- Calidad de grabacion: ${currentSettings.recordingQuality}
+- Servicio de streaming configurado: ${currentSettings.hasStreamService ? 'Si' : 'No'}
+`
+    : '';
   const prompt = `Eres un experto en configuracion de OBS para streaming y grabacion.
 Analiza el hardware del usuario y recomienda la mejor configuracion posible.
 
@@ -49,7 +60,7 @@ Hardware disponible:
 - RAM: ${systemInfo.ram.total}GB
 - OS: ${systemInfo.os.distro} ${systemInfo.os.release}
 - Hardware NVENC disponible: ${systemInfo.gpu.hasNvenc ? 'Si' : 'No'}
-
+${baselineSection}
 Responde en JSON con este formato exacto, sin texto adicional:
 {
   "recommendations": {

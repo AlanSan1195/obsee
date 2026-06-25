@@ -1,5 +1,6 @@
 import { useAppStore } from '../store';
-import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationRequest, OBSBackup, OBSAudioConfig, OBSAudioSettingsSnapshot, OBSConfig, OBSConnectionSettings, OBSSettingsSnapshot, SystemInfo } from '../../shared/types';
+import { inferObsUsage } from '../../shared/obsUsage';
+import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationRequest, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, BeginGuidedSourceResult, CameraLayout, CreateGuidedSourceConfig, OBSBackup, OBSAudioConfig, OBSAudioSettingsSnapshot, OBSConfig, OBSConnectionSettings, OBSSettingsSnapshot, ResolvedSourceKind, SceneSourcesSnapshot, ScenesSnapshot, SetCameraLayoutInput, SystemInfo } from '../../shared/types';
 
 function getElectronAPI() {
   if (!window.electronAPI) {
@@ -18,6 +19,11 @@ export function useElectronAPI() {
   const setObsMessage = useAppStore((state) => state.setObsMessage);
   const setError = useAppStore((state) => state.setError);
   const setIsApplying = useAppStore((state) => state.setIsApplying);
+  const setScenes = useAppStore((state) => state.setScenes);
+  const setCurrentSceneName = useAppStore((state) => state.setCurrentSceneName);
+  const setSelectedSceneName = useAppStore((state) => state.setSelectedSceneName);
+  const setSceneSources = useAppStore((state) => state.setSceneSources);
+  const setAvailableSourceKinds = useAppStore((state) => state.setAvailableSourceKinds);
 
   const getSystemInfo = async () => {
     try {
@@ -60,11 +66,22 @@ export function useElectronAPI() {
         if (snapshotResult.success && snapshotResult.snapshot) {
           setObsSettingsSnapshot(snapshotResult.snapshot);
           setObsAudioSnapshot(snapshotResult.snapshot.audio ?? null);
+          // Autodetectar modo y plataforma desde la config que OBS ya tiene
+          // (lo que el usuario eligio en el asistente inicial de OBS), sin pisar
+          // una eleccion previa del usuario.
+          const usage = inferObsUsage(snapshotResult.snapshot);
+          const state = useAppStore.getState();
+          if (!state.mode) state.setMode(usage.mode);
+          if (!state.platform && usage.platform) state.setPlatform(usage.platform);
         } else {
           setObsSettingsSnapshot(null);
           setObsAudioSnapshot(null);
           setObsMessage(snapshotResult.message);
         }
+        await Promise.all([
+          refreshScenes().catch(() => undefined),
+          loadSourceKinds().catch(() => undefined),
+        ]);
       }
       return result;
     } catch (error) {
@@ -123,6 +140,163 @@ export function useElectronAPI() {
     }
   };
 
+  const refreshScenes = async () => {
+    const result = await getElectronAPI().obs.getScenes();
+    if (result.success && result.snapshot) {
+      setScenes(result.snapshot.scenes);
+      setCurrentSceneName(result.snapshot.currentProgramSceneName ?? null);
+      const selected = useAppStore.getState().selectedSceneName;
+      const stillExists = selected && result.snapshot.scenes.some((scene) => scene.sceneName === selected);
+      if (!stillExists) {
+        setSelectedSceneName(result.snapshot.currentProgramSceneName ?? result.snapshot.scenes[0]?.sceneName ?? null);
+      }
+    }
+    return result;
+  };
+
+  const loadSourceKinds = async () => {
+    const result = await getElectronAPI().obs.getSourceKinds();
+    if (result.success && result.resolved) {
+      setAvailableSourceKinds(result.resolved);
+    }
+    return result;
+  };
+
+  const createScene = async (name: string) => {
+    const result = await getElectronAPI().obs.createScene(name);
+    if (result.success && result.snapshot) {
+      setScenes(result.snapshot.scenes);
+      setCurrentSceneName(result.snapshot.currentProgramSceneName ?? null);
+      setSelectedSceneName(name);
+      setSceneSources([]);
+    } else if (!result.success) {
+      setError(result.message);
+    }
+    return result;
+  };
+
+  const selectScene = async (name: string) => {
+    setSelectedSceneName(name);
+    const result = await getElectronAPI().obs.setCurrentScene(name);
+    if (result.success) {
+      setCurrentSceneName(name);
+    } else {
+      setError(result.message);
+    }
+    await loadSceneSources(name);
+    return result;
+  };
+
+  const removeScene = async (name: string) => {
+    const result = await getElectronAPI().obs.removeScene(name);
+    if (result.success && result.snapshot) {
+      setScenes(result.snapshot.scenes);
+      setCurrentSceneName(result.snapshot.currentProgramSceneName ?? null);
+      const next = result.snapshot.currentProgramSceneName ?? result.snapshot.scenes[0]?.sceneName ?? null;
+      setSelectedSceneName(next);
+      if (next) {
+        await loadSceneSources(next);
+      } else {
+        setSceneSources([]);
+      }
+    } else if (!result.success) {
+      setError(result.message);
+    }
+    return result;
+  };
+
+  const loadSceneSources = async (name: string) => {
+    const result = await getElectronAPI().obs.getSceneSources(name);
+    if (result.success && result.snapshot) {
+      setSceneSources(result.snapshot.items);
+    }
+    return result;
+  };
+
+  const beginGuidedSource = async (arg: BeginGuidedSourceInput): Promise<BeginGuidedSourceResult> => {
+    const result = await getElectronAPI().obs.beginGuidedSource(arg);
+    if (!result.success) {
+      setError(result.message);
+    }
+    return result;
+  };
+
+  const applyGuidedSourceDevice = async (arg: ApplyGuidedSourceDeviceInput) => {
+    const result = await getElectronAPI().obs.applyGuidedSourceDevice(arg);
+    if (!result.success) {
+      setError(result.message);
+    }
+    return result;
+  };
+
+  const cancelGuidedSource = async (inputName: string) => {
+    return getElectronAPI().obs.cancelGuidedSource(inputName);
+  };
+
+  const setCameraLayout = async (sceneName: string, sceneItemId: number, layout: CameraLayout) => {
+    const result = await getElectronAPI().obs.setCameraLayout({ sceneName, sceneItemId, layout });
+    if (!result.success) {
+      setError(result.message);
+    }
+    return result;
+  };
+
+  const setSourceToBottom = async (sceneName: string, sceneItemId: number) => {
+    return getElectronAPI().obs.setSourceToBottom({ sceneName, sceneItemId });
+  };
+
+  const createCameraScene = async (sceneName: string, inputName: string, deviceId: string, propertyName: string) => {
+    const result = await getElectronAPI().obs.createCameraScene({ sceneName, inputName, deviceId, propertyName });
+    if (!result.success) {
+      setError(result.message);
+    }
+    return result;
+  };
+
+  const createGuidedSource = async (config: CreateGuidedSourceConfig) => {
+    const result = await getElectronAPI().obs.createGuidedSource(config);
+    if (!result.success) {
+      setError(result.message);
+    }
+    return result;
+  };
+
+  const removeSource = async (name: string, sceneName: string) => {
+    const result = await getElectronAPI().obs.removeSource(name);
+    if (result.success) {
+      await loadSceneSources(sceneName);
+    } else {
+      setError(result.message);
+    }
+    return result;
+  };
+
+  const renameSource = async (inputName: string, newInputName: string) => {
+    const result = await getElectronAPI().obs.renameSource({ inputName, newInputName });
+    if (!result.success) {
+      setError(result.message);
+    }
+    return result;
+  };
+
+  const setSourceEnabled = async (sceneName: string, sceneItemId: number, enabled: boolean) => {
+    const result = await getElectronAPI().obs.setSourceEnabled({ sceneName, sceneItemId, enabled });
+    if (result.success) {
+      await loadSceneSources(sceneName);
+    } else {
+      setError(result.message);
+    }
+    return result;
+  };
+
+  const getSourceScreenshot = async (sourceName: string, maxWidth?: number) => {
+    return getElectronAPI().obs.sourceScreenshot({ sourceName, maxWidth });
+  };
+
+  const pickImageFile = async () => {
+    return getElectronAPI().obs.pickImageFile();
+  };
+
   const getLastBackup = async () => {
     return getElectronAPI().obs.getLastBackup();
   };
@@ -153,6 +327,24 @@ export function useElectronAPI() {
     applyConfig,
     getLastBackup,
     restoreLastBackup,
+    refreshScenes,
+    loadSourceKinds,
+    createScene,
+    selectScene,
+    removeScene,
+    loadSceneSources,
+    beginGuidedSource,
+    applyGuidedSourceDevice,
+    cancelGuidedSource,
+    setCameraLayout,
+    setSourceToBottom,
+    createCameraScene,
+    createGuidedSource,
+    removeSource,
+    renameSource,
+    setSourceEnabled,
+    getSourceScreenshot,
+    pickImageFile,
   };
 }
 
@@ -169,6 +361,24 @@ declare global {
         restoreLastBackup: () => Promise<{ success: boolean; message: string; warnings: string[] }>;
         configure: (config: OBSConfig) => Promise<{ success: boolean; message: string }>;
         configureAudio: (config: OBSAudioConfig) => Promise<{ success: boolean; message: string; snapshot?: OBSAudioSettingsSnapshot; warnings: string[] }>;
+        getScenes: () => Promise<{ success: boolean; message: string; snapshot?: ScenesSnapshot }>;
+        createScene: (name: string) => Promise<{ success: boolean; message: string; snapshot?: ScenesSnapshot }>;
+        setCurrentScene: (name: string) => Promise<{ success: boolean; message: string }>;
+        removeScene: (name: string) => Promise<{ success: boolean; message: string; snapshot?: ScenesSnapshot }>;
+        getSourceKinds: () => Promise<{ success: boolean; message: string; resolved?: ResolvedSourceKind[] }>;
+        getSceneSources: (name: string) => Promise<{ success: boolean; message: string; snapshot?: SceneSourcesSnapshot }>;
+        beginGuidedSource: (arg: BeginGuidedSourceInput) => Promise<BeginGuidedSourceResult>;
+        applyGuidedSourceDevice: (arg: ApplyGuidedSourceDeviceInput) => Promise<{ success: boolean; message: string; warnings: string[] }>;
+        setCameraLayout: (arg: SetCameraLayoutInput) => Promise<{ success: boolean; message: string; warnings: string[] }>;
+        setSourceToBottom: (arg: { sceneName: string; sceneItemId: number }) => Promise<{ success: boolean; message: string }>;
+        createCameraScene: (arg: { sceneName: string; inputName: string; deviceId: string; propertyName: string }) => Promise<{ success: boolean; message: string; sceneName?: string; warnings: string[] }>;
+        cancelGuidedSource: (name: string) => Promise<{ success: boolean; message: string }>;
+        createGuidedSource: (config: CreateGuidedSourceConfig) => Promise<{ success: boolean; message: string; sceneItemId?: number; warnings: string[] }>;
+        removeSource: (name: string) => Promise<{ success: boolean; message: string }>;
+        renameSource: (arg: { inputName: string; newInputName: string }) => Promise<{ success: boolean; message: string }>;
+        setSourceEnabled: (arg: { sceneName: string; sceneItemId: number; enabled: boolean }) => Promise<{ success: boolean; message: string }>;
+        sourceScreenshot: (arg: { sourceName: string; maxWidth?: number }) => Promise<{ success: boolean; message: string; imageData?: string }>;
+        pickImageFile: () => Promise<{ canceled: boolean; filePath?: string }>;
         onConnectionChanged: (callback: (status: { connected: boolean; message: string }) => void) => () => void;
       };
       system: {

@@ -1,10 +1,22 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'path';
 import { obsManager } from './obs-manager';
 import dotenv from 'dotenv';
 import type { AIRecommendationExplanationRequest, AIRecommendationRequest } from '../shared/types';
 import { getLocalRecommendation, getLocalRecommendationExplanation } from '../shared/localRecommendation';
-import { validateAIRecommendationExplanationRequest, validateAIRecommendationRequest, validateOBSAudioConfig, validateOBSConfig, validateOBSConnectionSettings } from '../shared/validation';
+import {
+  validateAIRecommendationExplanationRequest,
+  validateAIRecommendationRequest,
+  validateApplyGuidedSourceDevice,
+  validateBeginGuidedSource,
+  validateCreateGuidedSourceConfig,
+  validateInputName,
+  validateOBSAudioConfig,
+  validateOBSConfig,
+  validateOBSConnectionSettings,
+  validateSceneName,
+  validateSetCameraLayout,
+} from '../shared/validation';
 import { loadBackup } from './backup-store';
 import { getRemoteAIUserMessage, getRemoteRecommendation, getRemoteRecommendationExplanation } from './ai/remote';
 
@@ -114,6 +126,169 @@ ipcMain.handle('obs:restore-last-backup', async () => {
     return { success: false, message: 'No hay respaldo guardado', warnings: [] };
   }
   return obsManager.restoreSnapshot(backup.snapshot);
+});
+
+ipcMain.handle('obs:get-scenes', async () => {
+  return obsManager.getScenesSnapshot();
+});
+
+ipcMain.handle('obs:create-scene', async (_, name: unknown) => {
+  const validation = validateSceneName(name);
+  if (!validation.success) {
+    return { success: false, message: validation.message };
+  }
+  return obsManager.createScene(validation.value);
+});
+
+ipcMain.handle('obs:set-current-scene', async (_, name: unknown) => {
+  const validation = validateSceneName(name);
+  if (!validation.success) {
+    return { success: false, message: validation.message };
+  }
+  return obsManager.setCurrentScene(validation.value);
+});
+
+ipcMain.handle('obs:remove-scene', async (_, name: unknown) => {
+  const validation = validateSceneName(name);
+  if (!validation.success) {
+    return { success: false, message: validation.message };
+  }
+  return obsManager.removeScene(validation.value);
+});
+
+ipcMain.handle('obs:get-source-kinds', async () => {
+  return obsManager.getAvailableSourceKinds();
+});
+
+ipcMain.handle('obs:get-scene-sources', async (_, name: unknown) => {
+  const validation = validateSceneName(name);
+  if (!validation.success) {
+    return { success: false, message: validation.message };
+  }
+  return obsManager.getSceneSources(validation.value);
+});
+
+ipcMain.handle('obs:begin-guided-source', async (_, arg: unknown) => {
+  const validation = validateBeginGuidedSource(arg);
+  if (!validation.success) {
+    return { success: false, message: validation.message, warnings: [] };
+  }
+  return obsManager.beginGuidedSource(validation.value.sceneName, validation.value.friendly);
+});
+
+ipcMain.handle('obs:apply-guided-source-device', async (_, arg: unknown) => {
+  const validation = validateApplyGuidedSourceDevice(arg);
+  if (!validation.success) {
+    return { success: false, message: validation.message, warnings: [] };
+  }
+  return obsManager.applyGuidedSourceDevice(validation.value);
+});
+
+ipcMain.handle('obs:cancel-guided-source', async (_, name: unknown) => {
+  const validation = validateInputName(name);
+  if (!validation.success) {
+    return { success: false, message: validation.message };
+  }
+  return obsManager.cancelGuidedSource(validation.value);
+});
+
+ipcMain.handle('obs:create-guided-source', async (_, arg: unknown) => {
+  const validation = validateCreateGuidedSourceConfig(arg);
+  if (!validation.success) {
+    return { success: false, message: validation.message, warnings: [] };
+  }
+  return obsManager.createGuidedSource(validation.value);
+});
+
+ipcMain.handle('obs:remove-source', async (_, name: unknown) => {
+  const validation = validateInputName(name);
+  if (!validation.success) {
+    return { success: false, message: validation.message };
+  }
+  return obsManager.removeInput(validation.value);
+});
+
+ipcMain.handle('obs:set-camera-layout', async (_, arg: unknown) => {
+  const validation = validateSetCameraLayout(arg);
+  if (!validation.success) {
+    return { success: false, message: validation.message, warnings: [] };
+  }
+  return obsManager.setCameraLayout(validation.value.sceneName, validation.value.sceneItemId, validation.value.layout);
+});
+
+ipcMain.handle('obs:create-camera-scene', async (_, arg: unknown) => {
+  if (typeof arg !== 'object' || arg === null) {
+    return { success: false, message: 'Solicitud de escena de camara invalida.', warnings: [] };
+  }
+  const a = arg as { sceneName?: unknown; inputName?: unknown; deviceId?: unknown; propertyName?: unknown };
+  const sceneName = validateSceneName(a.sceneName);
+  if (!sceneName.success) return { success: false, message: sceneName.message, warnings: [] };
+  const inputName = validateInputName(a.inputName);
+  if (!inputName.success) return { success: false, message: inputName.message, warnings: [] };
+  if (typeof a.deviceId !== 'string' || a.deviceId.trim().length === 0) {
+    return { success: false, message: 'Selecciona una camara valida.', warnings: [] };
+  }
+  if (typeof a.propertyName !== 'string' || a.propertyName.trim().length === 0) {
+    return { success: false, message: 'Falta la propiedad del dispositivo.', warnings: [] };
+  }
+  return obsManager.createCameraScene(sceneName.value, inputName.value, a.deviceId.trim(), a.propertyName.trim());
+});
+
+ipcMain.handle('obs:set-source-to-bottom', async (_, arg: unknown) => {
+  if (
+    typeof arg !== 'object' || arg === null
+    || typeof (arg as { sceneName?: unknown }).sceneName !== 'string'
+    || typeof (arg as { sceneItemId?: unknown }).sceneItemId !== 'number'
+  ) {
+    return { success: false, message: 'Solicitud de reordenado invalida.' };
+  }
+  const { sceneName, sceneItemId } = arg as { sceneName: string; sceneItemId: number };
+  return obsManager.setSourceToBottom(sceneName, sceneItemId);
+});
+
+ipcMain.handle('obs:rename-source', async (_, arg: unknown) => {
+  if (typeof arg !== 'object' || arg === null) {
+    return { success: false, message: 'Solicitud de renombrado invalida.' };
+  }
+  const current = validateInputName((arg as { inputName?: unknown }).inputName);
+  if (!current.success) return { success: false, message: current.message };
+  const next = validateInputName((arg as { newInputName?: unknown }).newInputName);
+  if (!next.success) return { success: false, message: next.message };
+  return obsManager.renameInput(current.value, next.value);
+});
+
+ipcMain.handle('obs:set-source-enabled', async (_, arg: unknown) => {
+  if (
+    typeof arg !== 'object' || arg === null
+    || typeof (arg as { sceneName?: unknown }).sceneName !== 'string'
+    || typeof (arg as { sceneItemId?: unknown }).sceneItemId !== 'number'
+    || typeof (arg as { enabled?: unknown }).enabled !== 'boolean'
+  ) {
+    return { success: false, message: 'Solicitud de visibilidad invalida.' };
+  }
+  const { sceneName, sceneItemId, enabled } = arg as { sceneName: string; sceneItemId: number; enabled: boolean };
+  return obsManager.setSceneItemEnabled(sceneName, sceneItemId, enabled);
+});
+
+ipcMain.handle('obs:source-screenshot', async (_, arg: unknown) => {
+  const sourceName = typeof arg === 'object' && arg !== null ? (arg as { sourceName?: unknown }).sourceName : undefined;
+  const maxWidth = typeof arg === 'object' && arg !== null ? (arg as { maxWidth?: unknown }).maxWidth : undefined;
+  if (typeof sourceName !== 'string' || sourceName.trim().length === 0) {
+    return { success: false, message: 'Falta el nombre de la fuente.' };
+  }
+  return obsManager.getSourceScreenshot(sourceName, typeof maxWidth === 'number' ? maxWidth : undefined);
+});
+
+ipcMain.handle('obs:pick-image-file', async () => {
+  if (!mainWindow) {
+    return { canceled: true, filePath: undefined };
+  }
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Selecciona una imagen',
+    filters: [{ name: 'Imagenes', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }],
+    properties: ['openFile'],
+  });
+  return { canceled: result.canceled, filePath: result.filePaths[0] };
 });
 
 ipcMain.handle('system:get-info', async () => {

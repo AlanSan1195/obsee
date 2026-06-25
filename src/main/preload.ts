@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AIRecommendationExplanationRequest, AIRecommendationRequest, OBSAudioConfig, OBSConfig, OBSConnectionSettings } from '../shared/types';
+import type { AIRecommendationExplanationRequest, AIRecommendationRequest, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, CreateGuidedSourceConfig, OBSAudioConfig, OBSConfig, OBSConnectionSettings, SetCameraLayoutInput } from '../shared/types';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   obs: {
@@ -12,6 +12,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     restoreLastBackup: () => ipcRenderer.invoke('obs:restore-last-backup'),
     configure: (config: OBSConfig) => ipcRenderer.invoke('obs:configure', config),
     configureAudio: (config: OBSAudioConfig) => ipcRenderer.invoke('obs:configure-audio', config),
+    getScenes: () => ipcRenderer.invoke('obs:get-scenes'),
+    createScene: (name: string) => ipcRenderer.invoke('obs:create-scene', name),
+    setCurrentScene: (name: string) => ipcRenderer.invoke('obs:set-current-scene', name),
+    removeScene: (name: string) => ipcRenderer.invoke('obs:remove-scene', name),
+    getSourceKinds: () => ipcRenderer.invoke('obs:get-source-kinds'),
+    getSceneSources: (name: string) => ipcRenderer.invoke('obs:get-scene-sources', name),
+    beginGuidedSource: (arg: BeginGuidedSourceInput) => ipcRenderer.invoke('obs:begin-guided-source', arg),
+    applyGuidedSourceDevice: (arg: ApplyGuidedSourceDeviceInput) => ipcRenderer.invoke('obs:apply-guided-source-device', arg),
+    setCameraLayout: (arg: SetCameraLayoutInput) => ipcRenderer.invoke('obs:set-camera-layout', arg),
+    setSourceToBottom: (arg: { sceneName: string; sceneItemId: number }) => ipcRenderer.invoke('obs:set-source-to-bottom', arg),
+    createCameraScene: (arg: { sceneName: string; inputName: string; deviceId: string; propertyName: string }) => ipcRenderer.invoke('obs:create-camera-scene', arg),
+    cancelGuidedSource: (name: string) => ipcRenderer.invoke('obs:cancel-guided-source', name),
+    createGuidedSource: (config: CreateGuidedSourceConfig) => ipcRenderer.invoke('obs:create-guided-source', config),
+    removeSource: (name: string) => ipcRenderer.invoke('obs:remove-source', name),
+    renameSource: (arg: { inputName: string; newInputName: string }) => ipcRenderer.invoke('obs:rename-source', arg),
+    setSourceEnabled: (arg: { sceneName: string; sceneItemId: number; enabled: boolean }) => ipcRenderer.invoke('obs:set-source-enabled', arg),
+    sourceScreenshot: (arg: { sourceName: string; maxWidth?: number }) => ipcRenderer.invoke('obs:source-screenshot', arg),
+    pickImageFile: () => ipcRenderer.invoke('obs:pick-image-file'),
     onConnectionChanged: (callback: (status: { connected: boolean; message: string }) => void) => {
       const listener = (
         _event: Electron.IpcRendererEvent,

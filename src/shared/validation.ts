@@ -1,4 +1,4 @@
-import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationField, AIRecommendationRequest, AIRecommendationSettings, OBSBackup, OBSAudioConfig, OBSConfig, OBSConnectionSettings, OBSMode, OBSPlatform, OBSSettingsSnapshot, SystemInfo } from './types';
+import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationField, AIRecommendationRequest, AIRecommendationSettings, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, CameraLayout, CreateGuidedSourceConfig, OBSBackup, OBSAudioConfig, OBSConfig, OBSConnectionSettings, OBSMode, OBSPlatform, OBSSettingsSnapshot, SetCameraLayoutInput, SourceKindFriendly, SystemInfo } from './types';
 
 type ValidationResult<T> =
   | { success: true; value: T }
@@ -20,6 +20,8 @@ const monitorTypes = [
   'OBS_MONITORING_TYPE_MONITOR_ONLY',
   'OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT',
 ];
+const sourceKindsFriendly: SourceKindFriendly[] = ['camera', 'display', 'window', 'game_console', 'image'];
+const cameraLayouts: CameraLayout[] = ['facecam', 'fullscreen'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -298,7 +300,28 @@ export function validateAIRecommendationRequest(value: unknown): ValidationResul
       systemInfo: systemInfo.value,
       mode: value.mode as OBSMode,
       platform: value.platform as OBSPlatform,
+      currentSettings: parseOptionalObsBaseline(value.currentSettings),
     },
+  };
+}
+
+// Acepta la configuracion base de OBS de forma tolerante: si falta o viene mal,
+// se ignora (no debe invalidar la solicitud, para mantener compatibilidad).
+function parseOptionalObsBaseline(value: unknown): AIRecommendationRequest['currentSettings'] {
+  if (!isRecord(value)) return undefined;
+  if (!isNonEmptyString(value.resolution) || !parseResolution(value.resolution).success) return undefined;
+  if (!isPositiveNumber(value.fps) || value.fps > 240) return undefined;
+  if (!isNonEmptyString(value.encoder)) return undefined;
+  if (!isFiniteNumber(value.bitrate) || value.bitrate < 0) return undefined;
+  if (!isNonEmptyString(value.recordingQuality)) return undefined;
+  if (typeof value.hasStreamService !== 'boolean') return undefined;
+  return {
+    resolution: value.resolution.trim(),
+    fps: Math.round(value.fps),
+    encoder: value.encoder.trim().toLowerCase(),
+    bitrate: Math.round(value.bitrate),
+    recordingQuality: value.recordingQuality.trim().toLowerCase(),
+    hasStreamService: value.hasStreamService,
   };
 }
 
@@ -463,6 +486,129 @@ export function validateOBSBackup(value: unknown): ValidationResult<OBSBackup> {
       createdAt: value.createdAt.trim(),
       appliedByObsrec: true,
       snapshot: backupSnapshot,
+    },
+  };
+}
+
+// --- Escenas y fuentes guiadas ---
+
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
+
+function validateName(value: unknown, label: string, max = 64): ValidationResult<string> {
+  if (!isNonEmptyString(value)) {
+    return { success: false, message: `${label} es obligatorio.` };
+  }
+  const trimmed = value.trim();
+  if (trimmed.length > max) {
+    return { success: false, message: `${label} no puede superar ${max} caracteres.` };
+  }
+  if (CONTROL_CHARS.test(trimmed)) {
+    return { success: false, message: `${label} contiene caracteres no validos.` };
+  }
+  return { success: true, value: trimmed };
+}
+
+export function validateSceneName(value: unknown): ValidationResult<string> {
+  return validateName(value, 'El nombre de la escena');
+}
+
+export function validateInputName(value: unknown): ValidationResult<string> {
+  return validateName(value, 'El nombre de la fuente');
+}
+
+export function validateSourceKindFriendly(value: unknown): ValidationResult<SourceKindFriendly> {
+  if (typeof value !== 'string' || !sourceKindsFriendly.includes(value as SourceKindFriendly)) {
+    return { success: false, message: 'Tipo de fuente no soportado.' };
+  }
+  return { success: true, value: value as SourceKindFriendly };
+}
+
+export function validateBeginGuidedSource(value: unknown): ValidationResult<BeginGuidedSourceInput> {
+  if (!isRecord(value)) {
+    return { success: false, message: 'La solicitud para agregar la fuente debe ser un objeto.' };
+  }
+  const sceneName = validateSceneName(value.sceneName);
+  if (!sceneName.success) return sceneName;
+  const friendly = validateSourceKindFriendly(value.friendly);
+  if (!friendly.success) return friendly;
+  return { success: true, value: { sceneName: sceneName.value, friendly: friendly.value } };
+}
+
+export function validateApplyGuidedSourceDevice(value: unknown): ValidationResult<ApplyGuidedSourceDeviceInput> {
+  if (!isRecord(value)) {
+    return { success: false, message: 'La solicitud para aplicar el dispositivo debe ser un objeto.' };
+  }
+  const inputName = validateInputName(value.inputName);
+  if (!inputName.success) return inputName;
+  const sceneName = validateSceneName(value.sceneName);
+  if (!sceneName.success) return sceneName;
+  if (typeof value.sceneItemId !== 'number' || !Number.isInteger(value.sceneItemId) || value.sceneItemId < 0) {
+    return { success: false, message: 'El identificador del elemento de escena no es valido.' };
+  }
+  if (!isNonEmptyString(value.propertyName)) {
+    return { success: false, message: 'Falta la propiedad del dispositivo.' };
+  }
+  if (!isNonEmptyString(value.deviceId)) {
+    return { success: false, message: 'Selecciona un dispositivo valido.' };
+  }
+  return {
+    success: true,
+    value: {
+      inputName: inputName.value,
+      sceneName: sceneName.value,
+      sceneItemId: value.sceneItemId,
+      propertyName: value.propertyName.trim(),
+      deviceId: value.deviceId.trim(),
+    },
+  };
+}
+
+export function validateSetCameraLayout(value: unknown): ValidationResult<SetCameraLayoutInput> {
+  if (!isRecord(value)) {
+    return { success: false, message: 'La solicitud de formato de camara debe ser un objeto.' };
+  }
+  const sceneName = validateSceneName(value.sceneName);
+  if (!sceneName.success) return sceneName;
+  if (typeof value.sceneItemId !== 'number' || !Number.isInteger(value.sceneItemId) || value.sceneItemId < 0) {
+    return { success: false, message: 'El identificador del elemento de escena no es valido.' };
+  }
+  if (typeof value.layout !== 'string' || !cameraLayouts.includes(value.layout as CameraLayout)) {
+    return { success: false, message: 'Formato de camara no soportado.' };
+  }
+  return {
+    success: true,
+    value: { sceneName: sceneName.value, sceneItemId: value.sceneItemId, layout: value.layout as CameraLayout },
+  };
+}
+
+export function validateCreateGuidedSourceConfig(value: unknown): ValidationResult<CreateGuidedSourceConfig> {
+  if (!isRecord(value)) {
+    return { success: false, message: 'La configuracion de la fuente debe ser un objeto.' };
+  }
+  const sceneName = validateSceneName(value.sceneName);
+  if (!sceneName.success) return sceneName;
+  const friendly = validateSourceKindFriendly(value.friendly);
+  if (!friendly.success) return friendly;
+  const sourceName = validateInputName(value.sourceName);
+  if (!sourceName.success) return sourceName;
+
+  if (friendly.value === 'image' && !isNonEmptyString(value.imagePath)) {
+    return { success: false, message: 'Selecciona un archivo de imagen.' };
+  }
+  if (typeof value.fitToCanvas !== 'boolean') {
+    return { success: false, message: 'El ajuste a pantalla debe ser un booleano.' };
+  }
+
+  return {
+    success: true,
+    value: {
+      sceneName: sceneName.value,
+      friendly: friendly.value,
+      sourceName: sourceName.value,
+      deviceId: isNonEmptyString(value.deviceId) ? value.deviceId.trim() : undefined,
+      imagePath: isNonEmptyString(value.imagePath) ? value.imagePath.trim() : undefined,
+      fitToCanvas: value.fitToCanvas,
     },
   };
 }

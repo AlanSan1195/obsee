@@ -105,6 +105,30 @@ describe('getLocalRecommendation', () => {
     })).recommendations.encoder).toBe('x264');
   });
 
+  it('respeta la config base de OBS cuando el hardware la soporta', () => {
+    const result = getLocalRecommendation(makeRequest({
+      currentSettings: { resolution: '2560x1440', fps: 30, encoder: 'x264', bitrate: 12000, recordingQuality: 'high', hasStreamService: true },
+    }));
+
+    // 1440p30 cabe dentro del techo 1080p60, asi que se respeta la config del usuario.
+    expect(result.recommendations.resolution).toBe('2560x1440');
+    expect(result.recommendations.fps).toBe(30);
+    expect(result.recommendations.bitrate).toBe(12000);
+    // El encoder se ajusta al optimo del hardware (NVENC), no al x264 que tenia OBS.
+    expect(result.recommendations.encoder).toBe('nvenc');
+    expect(result.reasoning).toContain('configuracion que OBS ya tenia');
+  });
+
+  it('ignora la config base si supera lo que el hardware sostiene', () => {
+    const result = getLocalRecommendation(makeRequest({
+      currentSettings: { resolution: '3840x2160', fps: 60, encoder: 'x264', bitrate: 40000, recordingQuality: 'high', hasStreamService: true },
+    })).recommendations;
+
+    // 4K60 excede el techo, cae al perfil seguro por hardware.
+    expect(result.resolution).toBe('1920x1080');
+    expect(result.fps).toBe(60);
+  });
+
   it('usa calidad alta solo para modo de grabacion', () => {
     expect(getLocalRecommendation(makeRequest({ mode: 'record_only' })).recommendations.recording_quality).toBe('high');
     expect(getLocalRecommendation(makeRequest({ mode: 'stream_record' })).recommendations.recording_quality).toBe('stream');

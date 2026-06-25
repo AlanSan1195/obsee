@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AIRecommendation, OBSAudioSettingsSnapshot, OBSConnectionSettings, OBSMode, OBSPlatform, OBSSettingsSnapshot, SystemInfo } from '../shared/types';
+import type { AIRecommendation, OBSAudioSettingsSnapshot, OBSConnectionSettings, OBSMode, OBSPlatform, OBSSettingsSnapshot, ResolvedSourceKind, Scene, SceneItemSummary, SystemInfo } from '../shared/types';
 
 interface AppState {
   mode: OBSMode | null;
@@ -14,6 +14,11 @@ interface AppState {
   obsConnected: boolean;
   obsMessage: string;
   error: string | null;
+  scenes: Scene[];
+  currentSceneName: string | null;
+  selectedSceneName: string | null;
+  sceneSources: SceneItemSummary[];
+  availableSourceKinds: ResolvedSourceKind[] | null;
 
   setMode: (mode: OBSMode) => void;
   setPlatform: (platform: OBSPlatform) => void;
@@ -27,6 +32,11 @@ interface AppState {
   setObsConnected: (connected: boolean) => void;
   setObsMessage: (message: string) => void;
   setError: (error: string | null) => void;
+  setScenes: (scenes: Scene[]) => void;
+  setCurrentSceneName: (name: string | null) => void;
+  setSelectedSceneName: (name: string | null) => void;
+  setSceneSources: (sources: SceneItemSummary[]) => void;
+  setAvailableSourceKinds: (kinds: ResolvedSourceKind[] | null) => void;
   reset: () => void;
 }
 
@@ -47,6 +57,11 @@ export const useAppStore = create<AppState>((set) => ({
   obsConnected: false,
   obsMessage: 'Desconectado de OBS',
   error: null,
+  scenes: [],
+  currentSceneName: null,
+  selectedSceneName: null,
+  sceneSources: [],
+  availableSourceKinds: null,
 
   setMode: (mode) => set({ mode }),
   setPlatform: (platform) => set({ platform }),
@@ -65,11 +80,21 @@ export const useAppStore = create<AppState>((set) => ({
   setObsConnected: (obsConnected) => set({ obsConnected }),
   setObsMessage: (obsMessage) => set({ obsMessage }),
   setError: (error) => set({ error }),
+  setScenes: (scenes) => set({ scenes }),
+  setCurrentSceneName: (currentSceneName) => set({ currentSceneName }),
+  setSelectedSceneName: (selectedSceneName) => set({ selectedSceneName }),
+  setSceneSources: (sceneSources) => set({ sceneSources }),
+  setAvailableSourceKinds: (availableSourceKinds) => set({ availableSourceKinds }),
   reset: () => set({
     systemInfo: null,
     recommendation: null,
     obsSettingsSnapshot: null,
     obsAudioSnapshot: null,
     error: null,
+    scenes: [],
+    currentSceneName: null,
+    selectedSceneName: null,
+    sceneSources: [],
+    availableSourceKinds: null,
   }),
 }));

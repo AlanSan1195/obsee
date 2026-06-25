@@ -1,10 +1,11 @@
 import React from 'react';
 import { useAppStore } from '../store';
 import { useElectronAPI } from '../hooks/useElectronAPI';
+import { extractObsBaseline } from '../../shared/obsUsage';
 import { IconSparkles, Spinner } from './ui';
 
 export function AnalyzeButton() {
-  const { mode, platform, isAnalyzing, setIsAnalyzing, setError } = useAppStore();
+  const { mode, platform, isAnalyzing, setIsAnalyzing, setError, obsSettingsSnapshot } = useAppStore();
   const { getSystemInfo, getAIRecommendation } = useElectronAPI();
 
   const isDisabled = !mode || !platform || isAnalyzing;
@@ -17,7 +18,9 @@ export function AnalyzeButton() {
 
     try {
       const systemInfo = await getSystemInfo();
-      await getAIRecommendation({ systemInfo, mode, platform });
+      // Incluir la config que OBS ya tiene como base para afinar la recomendacion.
+      const currentSettings = obsSettingsSnapshot ? extractObsBaseline(obsSettingsSnapshot) : undefined;
+      await getAIRecommendation({ systemInfo, mode, platform, currentSettings });
     } catch (error) {
       console.error('Analysis failed:', error);
     } finally {

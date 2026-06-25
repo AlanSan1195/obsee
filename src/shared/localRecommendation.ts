@@ -12,7 +12,13 @@ function getEncoder(request: AIRecommendationRequest): string {
   return 'x264';
 }
 
-function getVideoProfile(request: AIRecommendationRequest) {
+function readResolutionDims(resolution: string): { width: number; height: number } | null {
+  const [width, height] = resolution.split('x').map(Number);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
+function getHardwareVideoProfile(request: AIRecommendationRequest) {
   const { cpu, ram } = request.systemInfo;
   const canUse1080p60 = cpu.cores >= 8 && ram.total >= 16;
   const wantsRecording = request.mode !== 'stream_only';
@@ -32,10 +38,46 @@ function getVideoProfile(request: AIRecommendationRequest) {
   };
 }
 
+// Combina lo que OBS ya tiene configurado (afinado por su asistente inicial segun
+// hardware y red) con el techo seguro del hardware: respeta la config del usuario
+// salvo que supere lo que su equipo puede sostener.
+function getVideoProfile(request: AIRecommendationRequest) {
+  const hardware = getHardwareVideoProfile(request);
+  const baseline = request.currentSettings;
+  if (!baseline) {
+    return { ...hardware, usedBaseline: false };
+  }
+
+  const baseDims = readResolutionDims(baseline.resolution);
+  const hwDims = readResolutionDims(hardware.resolution);
+  if (!baseDims || !hwDims) {
+    return { ...hardware, usedBaseline: false };
+  }
+
+  const baseWorkload = baseDims.width * baseDims.height * baseline.fps;
+  const hardwareCeiling = hwDims.width * hwDims.height * hardware.fps;
+
+  // Si lo que OBS tiene supera el techo del hardware, usamos el perfil seguro.
+  if (baseWorkload > hardwareCeiling * 1.05) {
+    return { ...hardware, usedBaseline: false };
+  }
+
+  return {
+    resolution: baseline.resolution,
+    fps: Math.min(baseline.fps, 120),
+    bitrate: baseline.bitrate > 0 ? baseline.bitrate : hardware.bitrate,
+    usedBaseline: true,
+  };
+}
+
 export function getLocalRecommendation(request: AIRecommendationRequest): AIRecommendation {
   const videoProfile = getVideoProfile(request);
   const encoder = getEncoder(request);
   const recordingQuality = request.mode === 'record_only' ? 'high' : 'stream';
+
+  const reasoning = videoProfile.usedBaseline
+    ? 'Recomendacion local basada en la configuracion que OBS ya tenia (definida en su asistente inicial segun tu hardware y red), ajustando el encoder al optimo de tu equipo (la IA no estuvo disponible).'
+    : 'Recomendacion local generada a partir de los nucleos de CPU, la RAM, el proveedor de GPU, la plataforma y el modo seleccionados (la IA no estuvo disponible).';
 
   return {
     source: 'local',
@@ -48,7 +90,7 @@ export function getLocalRecommendation(request: AIRecommendationRequest): AIReco
       recording_format: 'mkv',
       recording_quality: recordingQuality,
     },
-    reasoning: 'Recomendacion local generada a partir de los nucleos de CPU, la RAM, el proveedor de GPU, la plataforma y el modo seleccionados (la IA no estuvo disponible).',
+    reasoning,
   };
 }
 

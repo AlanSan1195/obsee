@@ -3,10 +3,16 @@ import {
   parseResolution,
   validateAIRecommendation,
   validateAIRecommendationExplanationRequest,
+  validateAIRecommendationRequest,
+  validateApplyGuidedSourceDevice,
+  validateBeginGuidedSource,
+  validateCreateGuidedSourceConfig,
   validateOBSBackup,
   validateOBSAudioConfig,
   validateOBSConfig,
   validateOBSConnectionSettings,
+  validateSceneName,
+  validateSetCameraLayout,
 } from './validation';
 
 const validAudioConfig = {
@@ -355,5 +361,136 @@ describe('validateOBSBackup', () => {
       success: false,
       message: 'OBS backup snapshot is incomplete.',
     });
+  });
+});
+
+describe('validateSceneName', () => {
+  it('acepta un nombre valido y lo recorta', () => {
+    expect(validateSceneName('  Mi escena  ')).toEqual({ success: true, value: 'Mi escena' });
+  });
+
+  it('rechaza nombres vacios', () => {
+    expect(validateSceneName('   ').success).toBe(false);
+  });
+
+  it('rechaza nombres con caracteres de control', () => {
+    expect(validateSceneName('mala\x00escena').success).toBe(false);
+  });
+});
+
+describe('validateBeginGuidedSource', () => {
+  it('acepta una escena y categoria validas', () => {
+    expect(validateBeginGuidedSource({ sceneName: 'Escena 1', friendly: 'camera' })).toEqual({
+      success: true,
+      value: { sceneName: 'Escena 1', friendly: 'camera' },
+    });
+  });
+
+  it('rechaza categorias no soportadas', () => {
+    expect(validateBeginGuidedSource({ sceneName: 'Escena 1', friendly: 'webcam' }).success).toBe(false);
+  });
+});
+
+describe('validateApplyGuidedSourceDevice', () => {
+  const base = {
+    inputName: 'Camara web',
+    sceneName: 'Escena 1',
+    sceneItemId: 3,
+    propertyName: 'video_device_id',
+    deviceId: 'cam-123',
+  };
+
+  it('acepta una solicitud completa', () => {
+    expect(validateApplyGuidedSourceDevice(base)).toEqual({ success: true, value: base });
+  });
+
+  it('rechaza sceneItemId negativo o no entero', () => {
+    expect(validateApplyGuidedSourceDevice({ ...base, sceneItemId: -1 }).success).toBe(false);
+    expect(validateApplyGuidedSourceDevice({ ...base, sceneItemId: 1.5 }).success).toBe(false);
+  });
+
+  it('rechaza deviceId vacio', () => {
+    expect(validateApplyGuidedSourceDevice({ ...base, deviceId: '' }).success).toBe(false);
+  });
+});
+
+describe('validateAIRecommendationRequest currentSettings', () => {
+  const baseRequest = {
+    mode: 'stream_record',
+    platform: 'twitch',
+    systemInfo: {
+      cpu: { model: 'CPU', cores: 8, speed: 3.5 },
+      gpu: { model: 'GPU', vram: 8192, vendor: 'NVIDIA', hasNvenc: true },
+      ram: { total: 16 },
+      os: { platform: 'darwin', distro: 'macOS', release: '15' },
+    },
+  };
+
+  it('acepta currentSettings valido', () => {
+    const result = validateAIRecommendationRequest({
+      ...baseRequest,
+      currentSettings: { resolution: '1920x1080', fps: 60, encoder: 'NVENC', bitrate: 6000, recordingQuality: 'High', hasStreamService: true },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.currentSettings).toEqual({
+        resolution: '1920x1080', fps: 60, encoder: 'nvenc', bitrate: 6000, recordingQuality: 'high', hasStreamService: true,
+      });
+    }
+  });
+
+  it('ignora currentSettings malformado sin invalidar la solicitud', () => {
+    const result = validateAIRecommendationRequest({ ...baseRequest, currentSettings: { resolution: 'mala' } });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.currentSettings).toBeUndefined();
+    }
+  });
+
+  it('funciona sin currentSettings (compatibilidad)', () => {
+    const result = validateAIRecommendationRequest(baseRequest);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.currentSettings).toBeUndefined();
+    }
+  });
+});
+
+describe('validateSetCameraLayout', () => {
+  it('acepta facecam y fullscreen', () => {
+    expect(validateSetCameraLayout({ sceneName: 'Escena 1', sceneItemId: 2, layout: 'facecam' }).success).toBe(true);
+    expect(validateSetCameraLayout({ sceneName: 'Escena 1', sceneItemId: 0, layout: 'fullscreen' }).success).toBe(true);
+  });
+
+  it('rechaza layout no soportado y sceneItemId invalido', () => {
+    expect(validateSetCameraLayout({ sceneName: 'Escena 1', sceneItemId: 2, layout: 'rotated' }).success).toBe(false);
+    expect(validateSetCameraLayout({ sceneName: 'Escena 1', sceneItemId: -1, layout: 'facecam' }).success).toBe(false);
+  });
+});
+
+describe('validateCreateGuidedSourceConfig', () => {
+  it('exige imagePath cuando la categoria es image', () => {
+    expect(
+      validateCreateGuidedSourceConfig({ sceneName: 'Escena 1', friendly: 'image', sourceName: 'Logo', fitToCanvas: true })
+        .success,
+    ).toBe(false);
+  });
+
+  it('acepta una imagen con ruta', () => {
+    const result = validateCreateGuidedSourceConfig({
+      sceneName: 'Escena 1',
+      friendly: 'image',
+      sourceName: 'Logo',
+      imagePath: '/tmp/logo.png',
+      fitToCanvas: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rechaza fitToCanvas no booleano', () => {
+    expect(
+      validateCreateGuidedSourceConfig({ sceneName: 'Escena 1', friendly: 'camera', sourceName: 'Cam', fitToCanvas: 'yes' })
+        .success,
+    ).toBe(false);
   });
 });

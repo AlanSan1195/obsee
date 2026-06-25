@@ -7,6 +7,7 @@ import { PCAnalysis } from './components/PCAnalysis';
 import { Recommendations } from './components/Recommendations';
 import { OBSComparison } from './components/OBSComparison';
 import { AudioConfiguration } from './components/AudioConfiguration';
+import { ScenesPanel } from './components/ScenesPanel';
 import { ImportButton } from './components/ImportButton';
 import { StatusBar } from './components/StatusBar';
 import { IconAlert, IconX } from './components/ui';
@@ -190,6 +191,12 @@ export default function App() {
         <PCAnalysis />
         <Recommendations />
         <OBSComparison />
+
+        <div className="flex items-center gap-3 pt-2 text-xs lowercase tracking-terminal text-text-faint">
+          <span>escenas</span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
+        <ScenesPanel />
 
         <div className="flex items-center gap-3 pt-2 text-xs lowercase tracking-terminal text-text-faint">
           <span>apply</span>

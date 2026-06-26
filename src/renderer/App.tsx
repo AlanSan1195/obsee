@@ -229,8 +229,7 @@ export default function App() {
             <ConsoleReport />
             <Recommendations />
             <OBSComparison />
-            <AudioConfiguration />
-            <ImportButton />
+            <AudioConfiguration onApplySuccess={() => setActiveTab(3)} />
           </div>
         )}
 
@@ -241,14 +240,9 @@ export default function App() {
                 <span>escenas y fuentes</span>
                 <span className="h-px flex-1 bg-border" />
               </div>
-              <button
-                type="button"
-                className="text-xs lowercase tracking-terminal text-text-muted transition-colors hover:text-primary"
-              >
-                actualizar
-              </button>
             </div>
             <ScenesPanel />
+            <ImportButton />
           </div>
         )}
       </main>

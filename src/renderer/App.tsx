@@ -63,6 +63,7 @@ export default function App() {
     obsConnected,
     analysisTarget,
     recommendation,
+    reset,
     setObsAudioSnapshot,
     setObsConnected,
     setObsMessage,
@@ -243,6 +244,18 @@ export default function App() {
             </div>
             <ScenesPanel />
             <ImportButton />
+            <div className="pt-4 border-t border-border">
+              <button
+                type="button"
+                onClick={() => {
+                  reset();
+                  setActiveTab(0);
+                }}
+                className="w-full rounded-none border border-text-muted/30 px-6 py-3 text-sm lowercase tracking-terminal text-text-muted transition-colors hover:border-text-muted hover:text-text"
+              >
+                <span className="opacity-60">./</span>nueva configuracion
+              </button>
+            </div>
           </div>
         )}
       </main>

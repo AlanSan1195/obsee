@@ -128,6 +128,8 @@ export const useAppStore = create<AppState>((set) => ({
   setConsoleProfile: (consoleProfile) => set({ consoleProfile }),
   setIsAnalyzingConsole: (isAnalyzingConsole) => set({ isAnalyzingConsole }),
   reset: () => set({
+    mode: null,
+    platform: null,
     systemInfo: null,
     recommendation: null,
     obsSettingsSnapshot: null,
@@ -140,6 +142,7 @@ export const useAppStore = create<AppState>((set) => ({
     availableSourceKinds: null,
     micProfile: null,
     isProfilingMic: false,
+    analysisTarget: 'pc',
     consoleProfile: null,
     isAnalyzingConsole: false,
     peripherals: null,

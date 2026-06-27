@@ -37,20 +37,6 @@ function MetaItem({ label, value, accent }: { label: string; value: string; acce
   );
 }
 
-function StatusRow({ label, value, accent, title }: { label: string; value: React.ReactNode; accent?: boolean; title?: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-1.5">
-      <span className="shrink-0 text-text-faint lowercase">{label}</span>
-      <span
-        className={`min-w-0 truncate text-right ${accent ? 'text-primary' : 'text-text'}`}
-        title={title}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabIndex>(0);
 
@@ -69,7 +55,6 @@ export default function App() {
     setObsMessage,
     setObsSettingsSnapshot,
   } = useAppStore();
-  const { disconnectFromOBS } = useElectronAPI();
 
   useEffect(() => {
     if (!window.electronAPI) return undefined;

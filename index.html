@@ -17,6 +17,9 @@
     <meta property="og:title" content="obsee — Configuración automática de OBS Studio" />
     <meta property="og:description" content="Analiza tu PC y aplica la mejor configuración de OBS Studio para streaming y grabación. Ve el diff completo antes de aplicar cualquier cambio." />
     <meta property="og:image" content="https://obsee.vercel.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="obsee — configura OBS sin saber de OBS" />
     <meta property="og:locale" content="es_MX" />
     <meta property="og:site_name" content="obsee" />
 
@@ -25,6 +28,9 @@
     <meta name="twitter:title" content="obsee — Configuración automática de OBS Studio" />
     <meta name="twitter:description" content="Analiza tu PC y aplica la mejor configuración de OBS Studio. Ve qué cambia y por qué, antes de tocar nada." />
     <meta name="twitter:image" content="https://obsee.vercel.app/og-image.png" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#0B0F14" />
 
     <!-- Structured data -->
     <script type="application/ld+json">
@@ -53,7 +59,20 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Contenido estático para crawlers sin JS; React lo reemplaza al montar -->
+    <div id="root">
+      <h1>obsee — configura OBS sin saber de OBS</h1>
+      <p>
+        obsee es una app web gratuita que configura OBS Studio por ti. Analiza tu
+        computadora, detecta tu hardware (CPU, GPU, RAM, capturadoras) y genera la
+        mejor configuración de streaming o grabación para tu equipo. Te muestra qué
+        va a cambiar y por qué antes de aplicar nada, guarda un respaldo de tu
+        configuración anterior y también perfila consolas (PS5, Xbox, Nintendo Switch).
+      </p>
+      <noscript>
+        <p>obsee necesita JavaScript para conectarse con OBS Studio. Actívalo para continuar.</p>
+      </noscript>
+    </div>
     <script type="module" src="/src/renderer/main.tsx"></script>
   </body>
 </html>

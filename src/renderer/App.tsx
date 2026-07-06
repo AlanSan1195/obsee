@@ -200,8 +200,8 @@ export default function App() {
                 <path d="M10 21v-2" />
               </svg>
             </h1>
-            <p className="max-w-md text-center text-sm leading-relaxed text-text-muted">No te preocupes si no sabes configurar  <span className="text-text">OBS</span>, obsee 
-              analiza tu equipo, detecta tu hardware y hace el mejor match de configuracion para tu OBS.
+            <p className="max-w-3xl text-center text-sm leading-relaxed text-text-muted">No te preocupes si no sabes configurar  <span className="text-text">OBS</span>, obsee 
+              analiza tu equipo, detecta tu hardware y hace el mejor match de configuración para tu OBS.
             </p>
 
             <ConnectPanel />

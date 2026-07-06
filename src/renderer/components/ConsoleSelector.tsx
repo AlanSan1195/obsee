@@ -28,7 +28,7 @@ export function ConsoleSelector() {
               aria-pressed={selected}
               className={`flex items-center justify-center rounded-none border px-3 py-4 text-center text-sm font-medium lowercase tracking-terminal transition-all duration-200 ${
                 selected
-                  ? 'border-primary/60 bg-primary/10 text-primary shadow-[0_0_28px_-10px_rgba(58,155,220,0.6)]'
+                  ? 'border-primary/60 bg-primary/10 text-primary shadow-[0_0_28px_-10px_rgba(59,111,224,0.6)]'
                   : 'border-border bg-white/[0.03] text-text-muted hover:-translate-y-0.5 hover:border-primary/30 hover:bg-surface-hover hover:text-text'
               }`}
             >

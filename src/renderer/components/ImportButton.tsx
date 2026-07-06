@@ -81,7 +81,7 @@ export function ImportButton() {
         disabled={!canImport || isApplying}
         className={`group flex w-full items-center justify-center gap-3 rounded-none px-6 py-4 text-base font-bold lowercase tracking-terminal transition-all duration-200 ${
           canImport && !isApplying
-            ? 'bg-primary text-background shadow-[0_0_26px_-8px_rgba(58,155,220,0.6)] hover:bg-primary-hover hover:shadow-[0_0_32px_-6px_rgba(58,155,220,0.75)] active:scale-[0.99]'
+            ? 'bg-primary text-background glow-primary hover:bg-primary-hover active:scale-[0.99]'
             : 'cursor-not-allowed border border-border bg-white/[0.03] text-text-muted'
         }`}
       >

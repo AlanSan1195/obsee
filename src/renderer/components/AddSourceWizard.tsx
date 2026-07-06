@@ -29,7 +29,7 @@ const CARDS: FriendlyCard[] = [
 ];
 
 const primaryButton =
-  'inline-flex items-center justify-center gap-1.5 rounded-none bg-primary px-4 py-2.5 text-sm font-bold lowercase tracking-terminal text-background shadow-[0_0_26px_-8px_rgba(58,155,220,0.6)] transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex items-center justify-center gap-1.5 rounded-none bg-primary px-4 py-2.5 text-sm font-bold lowercase tracking-terminal text-background glow-primary transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50';
 const secondaryButton =
   'inline-flex items-center justify-center gap-1.5 rounded-none border border-border px-4 py-2.5 text-sm font-semibold text-text transition-colors hover:border-primary/40 hover:bg-white/[0.04]';
 

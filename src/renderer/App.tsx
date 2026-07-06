@@ -86,46 +86,70 @@ export default function App() {
 
   return (
     <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 py-7 font-mono lg:px-8">
-      <div className="app-backdrop" aria-hidden="true">
-        <span className="app-scanbeam" />
-      </div>
+      <div className="app-backdrop" aria-hidden="true" />
 
       {/* top meta strip */}
-      <div className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-border pb-3 text-[0.7rem] lowercase tracking-terminal">
-        <span className="flex items-center gap-2">
-          <span
-            className={`inline-block h-2 w-2 ${obsConnected ? 'animate-pulse-dot bg-primary text-glow' : 'bg-text-faint'}`}
-          />
-          <span className={obsConnected ? 'text-primary' : 'text-text-muted'}>
-            {obsConnected ? 'online' : 'offline'}
-          </span>
+      <header className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-3 text-[0.7rem] lowercase tracking-terminal">
+        <span className="font-display text-sm font-black tracking-[0.06em] text-text">
+          <span className="text-primary text-glow">obs</span>ee
         </span>
-        <MetaItem label="obs" value={obsConnected ? 'linked' : 'no-conn'} accent={obsConnected} />
+        <span
+          className={`flex items-center gap-1.5 border px-2 py-0.5 ${
+            obsConnected ? 'border-primary/40 text-primary' : 'border-border text-text-muted'
+          }`}
+        >
+          <span
+            className={`inline-block h-1.5 w-1.5 rounded-full ${obsConnected ? 'animate-pulse-dot bg-primary' : 'bg-text-faint'}`}
+          />
+          {obsConnected ? 'online' : 'offline'}
+        </span>
+        <span className="hidden h-3 w-px bg-border sm:block" />
         <MetaItem label="mode" value={mode ? modeLabels[mode] : '—'} />
         <MetaItem label="target" value={platform ?? '—'} />
         <MetaItem label="os" value={systemInfo ? systemInfo.os.distro.toLowerCase() : '—'} />
         <span className="ml-auto text-text-faint">v{APP_VERSION}</span>
-      </div>
+      </header>
 
-      {/* tab bar */}
-      <div className="mb-8 flex items-center gap-2">
-        {tabs.map((tab, idx) => (
-          <button
-            key={idx}
-            onClick={() => !tab.blocked && setActiveTab(idx as TabIndex)}
-            disabled={tab.blocked}
-            className={`px-3 py-1.5 text-xs lowercase tracking-terminal transition-colors ${
-              activeTab === idx
-                ? 'border border-primary bg-primary/10 text-primary'
-                : tab.blocked
-                  ? 'border border-text-faint/30 text-text-faint/50 cursor-not-allowed'
-                  : 'border border-text-muted/30 text-text-muted hover:border-text-muted hover:text-text'
-            }`}
-          >
-            {tab.completed && <span className="text-primary">✓</span>} {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* stepper */}
+      <nav className="mb-8 flex items-center gap-2 sm:gap-3" aria-label="progreso">
+        {tabs.map((tab, idx) => {
+          const isActive = activeTab === idx;
+          const num = String(idx + 1).padStart(2, '0');
+          return (
+            <React.Fragment key={idx}>
+              {idx > 0 && (
+                <span
+                  className={`h-px flex-1 transition-colors ${activeTab >= idx ? 'bg-primary/40' : 'bg-border'}`}
+                  aria-hidden="true"
+                />
+              )}
+              <button
+                onClick={() => !tab.blocked && setActiveTab(idx as TabIndex)}
+                disabled={tab.blocked}
+                aria-current={isActive ? 'step' : undefined}
+                className={`group flex items-center gap-2 px-1 text-xs lowercase tracking-terminal transition-colors disabled:cursor-not-allowed ${
+                  isActive ? 'text-primary' : tab.blocked ? 'text-text-faint/50' : 'text-text-muted hover:text-text'
+                }`}
+              >
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center border text-[0.7rem] font-bold transition-all ${
+                    isActive
+                      ? 'border-primary bg-primary text-background glow-primary'
+                      : tab.completed
+                        ? 'border-primary/50 text-primary'
+                        : tab.blocked
+                          ? 'border-text-faint/30'
+                          : 'border-text-muted/40 group-hover:border-text-muted'
+                  }`}
+                >
+                  {tab.completed && !isActive ? '✓' : num}
+                </span>
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            </React.Fragment>
+          );
+        })}
+      </nav>
 
       {error && (
         <div
@@ -152,7 +176,10 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 0 && (
-          <div className="flex flex-col items-center justify-center gap-8 py-12">
+          <div className="flex flex-col items-center justify-center gap-6 py-12">
+            <span className="text-[0.7rem] lowercase tracking-terminal text-text-faint">
+              <span className="text-primary">$</span> obsee --init<span className="blink-cursor ml-1" />
+            </span>
             <h1 className="flex items-center font-display text-6xl font-black leading-none tracking-[0.02em] text-text sm:text-7xl">
               <span className="text-primary text-glow">obs</span>ee
               <svg
@@ -164,7 +191,7 @@ export default function App() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 className="ml-2 h-[0.72em] w-[0.72em] text-primary"
-                style={{ filter: 'drop-shadow(0 0 8px rgba(58, 155, 220, 0.7))' }}
+                style={{ filter: 'drop-shadow(0 0 8px rgba(59, 111, 224, 0.7))' }}
               >
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M5 6a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -12" />
@@ -182,6 +209,15 @@ export default function App() {
             <p className="max-w-md text-center text-sm leading-relaxed text-text-muted">
               Analiza tu equipo, detecta tu hardware y obtén la mejor configuración para un stream o directo de calidad <span className="text-text">antes</span> de aplicarlo.
             </p>
+
+            {/* aviso beta, sin ensuciar el hero */}
+            <div className="flex w-full max-w-md items-center gap-2 border border-border bg-primary/[0.03] px-4 py-3 text-left text-xs leading-relaxed text-text-muted">
+              <span className="border border-primary/40 px-1.5 py-px text-[0.6rem] font-bold uppercase tracking-terminal text-primary">
+                beta
+              </span>
+              <span>version en prueba: revisa en OBS los ajustes aplicados antes de un directo importante.</span>
+            </div>
+
             <ConnectPanel />
           </div>
         )}

@@ -7,14 +7,14 @@ const platforms = [
     id: 'twitch',
     label: 'twitch',
     icon: IconTwitch,
-    selectedClasses: 'border-primary/60 bg-primary/10 text-primary shadow-[0_0_28px_-10px_rgba(58,155,220,0.6)]',
+    selectedClasses: 'border-primary/60 bg-primary/10 text-primary shadow-[0_0_28px_-10px_rgba(59,111,224,0.6)]',
     selectedIconClasses: 'border-primary/50 bg-primary/15 text-primary',
   },
   {
     id: 'youtube',
     label: 'youtube',
     icon: IconYoutube,
-    selectedClasses: 'border-primary/60 bg-primary/10 text-primary shadow-[0_0_28px_-10px_rgba(58,155,220,0.6)]',
+    selectedClasses: 'border-primary/60 bg-primary/10 text-primary shadow-[0_0_28px_-10px_rgba(59,111,224,0.6)]',
     selectedIconClasses: 'border-primary/50 bg-primary/15 text-primary',
   },
 ] as const;

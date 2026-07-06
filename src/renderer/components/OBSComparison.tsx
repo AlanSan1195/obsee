@@ -146,7 +146,7 @@ export function OBSComparison() {
 
   return (
     <Section
-      title="obs.diff"
+      title="obs.comparar"
       icon={<IconActivity className="h-4 w-4" />}
       action={
         <>
@@ -154,7 +154,7 @@ export function OBSComparison() {
             <button
               type="button"
               onClick={() => setRestoreDialogOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-text transition-colors hover:border-primary/40 hover:bg-white/[0.04]"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-text transition-colors hover:border-secondary/40 hover:bg-surface-hover"
             >
               <IconRefresh className="h-3.5 w-3.5" />
               Restaurar configuracion anterior
@@ -163,8 +163,8 @@ export function OBSComparison() {
           <span
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
               changeCount === 0
-                ? 'border-primary/40 bg-primary/10 text-primary'
-                : 'border-primary/40 bg-primary/10 text-primary'
+                ? 'border-secondary/40 bg-secondary/10 text-secondary'
+                : 'border-warning/40 bg-warning/10 text-warning'
             }`}
           >
             {changeCount} cambio{changeCount === 1 ? '' : 's'}
@@ -184,19 +184,19 @@ export function OBSComparison() {
           return (
             <div
               key={row.label}
-              className="grid grid-cols-[1fr_1fr_1fr_104px] items-center border-t border-border px-4 py-3 text-sm transition-colors hover:bg-primary/[0.04]"
+              className="grid grid-cols-[1fr_1fr_1fr_104px] items-center border-t border-border px-4 py-3 text-sm transition-colors hover:bg-surface-hover/70"
             >
               <span className="font-medium text-text">{row.label}</span>
               <span className="text-text-muted">{row.current || 'Desconocido'}</span>
               <span className="text-text">{row.recommended}</span>
               <span>
                 {same ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-secondary/30 bg-secondary/10 px-2.5 py-0.5 text-xs font-semibold text-secondary">
                     <IconCheck className="h-3 w-3" />
                     Mantener
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-black px-2.5 py-0.5 text-xs font-semibold text-amber-200">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-warning/35 bg-warning/10 px-2.5 py-0.5 text-xs font-semibold text-warning">
                     Cambiar
                   </span>
                 )}

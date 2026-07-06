@@ -72,8 +72,8 @@ export function AnalyzeButton() {
       : isConsole && !consoleModel
         ? 'selecciona tu consola'
         : isConsole
-          ? 'analyze --console'
-          : 'analyze --recommend';
+          ? 'analizar --consola'
+          : 'analizar --recomendar';
 
   return (
     <button
@@ -82,8 +82,8 @@ export function AnalyzeButton() {
       disabled={isDisabled}
       className={`group flex w-full items-center justify-center gap-3 rounded-none px-6 py-4 text-base font-bold lowercase tracking-terminal transition-all duration-200 ${
         isDisabled
-          ? 'cursor-not-allowed border border-border bg-white/[0.03] text-text-muted'
-          : 'bg-primary text-background glow-primary hover:bg-primary-hover active:scale-[0.99]'
+          ? 'cursor-not-allowed border border-border bg-surface/45 text-text-muted'
+          : 'ai-glint bg-primary text-background glow-primary hover:bg-primary-hover active:scale-[0.99]'
       }`}
     >
       {busy ? (

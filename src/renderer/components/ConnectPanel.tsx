@@ -30,7 +30,7 @@ export function ConnectPanel() {
 
   return (
     <Section
-      title="obs.connect"
+      title="obs.conectar"
       accent
       icon={<IconPlug className="h-4 w-4" />}
       subtitle="OBS debe estar abierto en esta misma computadora con el servidor WebSocket activado: Herramientas > Ajustes del servidor WebSocket. Usa Chrome, Edge o Firefox (Safari no puede conectarse a OBS)."
@@ -102,7 +102,7 @@ export function ConnectPanel() {
           className="flex w-full items-center justify-center gap-2 rounded-none border border-primary/40 bg-primary/[0.06] px-6 py-3.5 text-base font-bold lowercase tracking-terminal text-primary transition-all duration-200 hover:border-primary/70 hover:bg-primary/15 hover:text-glow active:scale-[0.99]"
         >
           <IconPlug className="h-5 w-5" />
-          <span><span className="opacity-60">./</span>connect --obs</span>
+          <span><span className="opacity-60">./</span>conectar --obs</span>
         </button>
       </div>
     </Section>

@@ -239,16 +239,16 @@ export function Section({ title, icon, subtitle, action, accent = false, childre
       {/* terminal title bar */}
       <header
         className={`flex flex-col gap-2 border-b px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between ${
-          accent ? 'border-primary/25 bg-primary/[0.04]' : 'border-border bg-white/[0.012]'
+          accent ? 'border-primary/25 bg-primary/[0.04]' : 'border-border bg-surface/45'
         }`}
       >
         <div className="flex min-w-0 items-center gap-2.5">
           <span
-            className={`h-2.5 w-2.5 shrink-0 ${accent ? 'bg-primary text-glow' : 'bg-text-muted/60'}`}
+            className={`h-2.5 w-2.5 shrink-0 ${accent ? 'bg-primary text-glow' : 'bg-secondary/70 glow-secondary'}`}
             aria-hidden="true"
           />
           {icon && (
-            <span className={`shrink-0 ${accent ? 'text-primary' : 'text-text-muted'}`}>
+            <span className={`shrink-0 ${accent ? 'text-primary' : 'text-secondary/80'}`}>
               {icon}
             </span>
           )}
@@ -260,16 +260,10 @@ export function Section({ title, icon, subtitle, action, accent = false, childre
             {title}
           </h3>
         </div>
-        {action ? (
-          <div className="flex flex-wrap items-center gap-2">{action}</div>
-        ) : (
-          <span className="hidden shrink-0 text-[0.65rem] lowercase tracking-terminal text-text-faint sm:block">
-            // {accent ? 'recommended' : 'module'}
-          </span>
-        )}
+        {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
       </header>
       {subtitle && (
-        <div className="border-b border-border/60 px-4 py-2 text-xs lowercase text-text-muted">
+        <div className="border-b border-border/60 bg-surface/30 px-4 py-2 text-xs lowercase text-text-muted">
           <span className="text-text-faint">$ </span>
           {subtitle}
         </div>

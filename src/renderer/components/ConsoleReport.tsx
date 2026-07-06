@@ -46,7 +46,7 @@ export function ConsoleReport() {
 
   if (isAnalyzingConsole) {
     return (
-      <Section title="consola.match" icon={<IconTv className="h-4 w-4" />}>
+      <Section title="consola.analisis" icon={<IconTv className="h-4 w-4" />}>
         <div className="flex items-center gap-3">
           <Spinner />
           <span className="text-sm text-text-muted">Analizando tu cadena de consola...</span>
@@ -61,7 +61,7 @@ export function ConsoleReport() {
 
   return (
     <Section
-      title="consola.match"
+      title="consola.analisis"
       icon={<IconTv className="h-4 w-4" />}
       subtitle="Como encajan tu consola, capturadora y monitor para la mejor captura posible."
     >
@@ -71,21 +71,21 @@ export function ConsoleReport() {
         <ComponentCard icon={<IconMonitor className="h-4 w-4" />} role="monitor" spec={profile.monitor} />
       </div>
 
-      <div className="mt-4 flex items-start gap-2 rounded-none border border-amber-500/30 bg-black p-4 text-sm text-amber-200">
+      <div className="mt-4 flex items-start gap-2 rounded-none border border-warning/35 bg-warning/[0.06] p-4 text-sm text-warning">
         <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
         <div>
           <span className="block font-semibold">Cuello de botella</span>
-          <span className="mt-0.5 block text-amber-100/90">{profile.bottleneck}</span>
+          <span className="mt-0.5 block text-warning/90">{profile.bottleneck}</span>
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2 rounded-none border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
+      <div className="mt-3 flex items-center gap-2 rounded-none border border-secondary/35 bg-secondary/10 px-4 py-3 text-sm text-secondary">
         <IconCheck className="h-4 w-4 shrink-0" />
         <span>Captura recomendada: <strong>{profile.captureResolution}</strong> a <strong>{profile.captureFps}fps</strong></span>
       </div>
 
       {profile.consoleSettings.length > 0 && (
-        <div className="mt-4 rounded-none border border-border bg-white/[0.02] p-4">
+        <div className="mt-4 rounded-none border border-border bg-surface/45 p-4">
           <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-text-muted">Ajustes en la consola</span>
           <ol className="list-decimal space-y-1.5 pl-5 text-sm text-text-muted">
             {profile.consoleSettings.map((step) => (

@@ -5,6 +5,7 @@ import { IconClapperboard, IconRefresh, Section } from './ui';
 import { SceneList } from './SceneList';
 import { SourceList } from './SourceList';
 import { AddSourceWizard } from './AddSourceWizard';
+import { SourcePreview } from './SourcePreview';
 
 const secondaryButton =
   'inline-flex items-center gap-1.5 rounded-none border border-border px-3 py-2 text-xs font-semibold text-text transition-colors hover:border-primary/40 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50';
@@ -65,6 +66,10 @@ export function ScenesPanel() {
         <p className="text-sm text-text-muted">Conectate a OBS primero para administrar escenas y fuentes.</p>
       ) : (
         <>
+          {/* preview persistente de la escena seleccionada: refleja en vivo lo que se agregue */}
+          <div className="mx-auto mb-6 w-full max-w-2xl">
+            <SourcePreview sourceName={selectedSceneName} persistent />
+          </div>
           <div className="grid gap-5 lg:grid-cols-2">
             <div>
               <h4 className="mb-2 text-xs lowercase tracking-terminal text-text-faint">escenas</h4>

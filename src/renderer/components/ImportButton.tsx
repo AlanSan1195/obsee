@@ -67,7 +67,7 @@ export function ImportButton() {
   // configuracion recomendada, y solo tiene sentido con OBS ya conectado.
   if (!obsConnected) {
     return (
-      <p className="rounded-none border border-border bg-white/[0.02] px-4 py-3 text-xs text-text-muted">
+      <p className="rounded-none border border-border bg-surface/45 px-4 py-3 text-xs text-text-muted">
         Conecta OBS arriba para poder aplicar la configuracion recomendada.
       </p>
     );
@@ -82,7 +82,7 @@ export function ImportButton() {
         className={`group flex w-full items-center justify-center gap-3 rounded-none px-6 py-4 text-base font-bold lowercase tracking-terminal transition-all duration-200 ${
           canImport && !isApplying
             ? 'bg-primary text-background glow-primary hover:bg-primary-hover active:scale-[0.99]'
-            : 'cursor-not-allowed border border-border bg-white/[0.03] text-text-muted'
+            : 'cursor-not-allowed border border-border bg-surface/45 text-text-muted'
         }`}
       >
         {isApplying ? (
@@ -93,7 +93,7 @@ export function ImportButton() {
         ) : (
           <>
             <IconUpload className="h-5 w-5" />
-            <span><span className="opacity-60">./</span>import --to obs</span>
+            <span><span className="opacity-60">./</span>importar --a obs</span>
           </>
         )}
       </button>
@@ -110,7 +110,7 @@ export function ImportButton() {
         {changedRows.length > 0 ? (
           <div className="space-y-2">
             {changedRows.map((row) => (
-              <div key={row.label} className="rounded-none border border-border bg-white/[0.02] p-3">
+              <div key={row.label} className="rounded-none border border-border bg-surface/45 p-3">
                 <span className="block text-xs font-semibold uppercase tracking-wider text-text-muted">{row.label}</span>
                 <span className="mt-1 block text-text">
                   {row.current || 'Desconocido'} → <span className="font-medium text-primary">{row.recommended}</span>

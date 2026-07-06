@@ -3,7 +3,6 @@ import { useAppStore } from '../store';
 import { useAppAPI } from '../hooks/useAppAPI';
 import type { DeviceOption, ResolvedSourceKind, SourceKindFriendly } from '../../shared/types';
 import { IconClapperboard, IconMonitor, IconTv, IconVideo, Spinner } from './ui';
-import { SourcePreview } from './SourcePreview';
 
 type AddSourceWizardProps = {
   sceneName: string;
@@ -257,7 +256,7 @@ export function AddSourceWizard({ sceneName, onClose, onCreated }: AddSourceWiza
         </div>
 
         {localError && (
-          <p className="border border-red-500/40 bg-black p-3 text-sm text-red-300">{localError}</p>
+          <p className="border border-danger/45 bg-danger/[0.06] p-3 text-sm text-danger">{localError}</p>
         )}
 
         {step === 'choose-what' && (
@@ -403,7 +402,6 @@ export function AddSourceWizard({ sceneName, onClose, onCreated }: AddSourceWiza
 
         {step === 'confirm' && (
           <div className="space-y-3">
-            <SourcePreview sourceName={inputName} />
             <label className="block space-y-1.5">
               <span className="text-xs lowercase tracking-terminal text-text-faint">nombre de la fuente</span>
               <input

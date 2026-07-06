@@ -60,17 +60,27 @@
 }
 
 :root {
-  /* ponytail: single color knob — retune the whole app from these RGB triplets */
+  /* color knobs — typography stays exactly as configured below */
+  --background-rgb: 4 6 12;        /* #04060c */
+  --surface-rgb: 7 17 28;          /* #07111c */
+  --surface-hover-rgb: 13 34 49;   /* #0d2231 */
+  --border-rgb: 49 86 111;         /* #31566f */
   --accent-rgb: 58 155 220;        /* #3a9bdc */
   --accent-hover-rgb: 91 178 235;  /* #5bb2eb */
   --accent-dim-rgb: 38 125 183;    /* #267db7 */
+  --secondary-rgb: 32 214 181;     /* #20d6b5 */
+  --warning-rgb: 242 184 75;       /* #f2b84b */
+  --danger-rgb: 239 93 111;        /* #ef5d6f */
   --accent: rgb(var(--accent-rgb));
   --accent-dim: rgb(var(--accent-dim-rgb));
+  --secondary: rgb(var(--secondary-rgb));
+  --warning: rgb(var(--warning-rgb));
+  --danger: rgb(var(--danger-rgb));
 }
 
 body {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  background-color: #04060c;
+  background-color: rgb(var(--background-rgb));
   color: #dbe4f7;
   min-height: 100vh;
   overflow-x: hidden;
@@ -87,8 +97,9 @@ body {
   overflow: hidden;
   pointer-events: none;
   background:
-    radial-gradient(1100px 620px at 50% -240px, rgb(var(--accent-rgb) / 0.06), transparent 70%),
-    #050505;
+    radial-gradient(1100px 620px at 50% -240px, rgb(var(--accent-rgb) / 0.26), transparent 70%),
+    linear-gradient(180deg, rgb(var(--surface-rgb) / 0.8), rgb(var(--background-rgb)) 12%),
+    rgb(var(--background-rgb));
 }
 
 .app-backdrop::after {
@@ -130,11 +141,11 @@ input[type='checkbox'] {
   .glass-card,
   .terminal-panel {
     position: relative;
-    border: 1px solid rgb(var(--accent-rgb) / 0.16);
+    border: 1px solid rgb(var(--border-rgb) / 0.48);
     background:
       linear-gradient(180deg, rgb(var(--accent-rgb) / 0.05), transparent 120px),
-      linear-gradient(#05080f, #05080f),
-      rgba(8, 12, 20, 0.6);
+      linear-gradient(rgb(var(--surface-rgb) / 0.02), rgb(5 8 15 / 2.98)),
+      rgb(var(--surface-rgb) / 0.66);
     backdrop-filter: blur(2px);
   }
 
@@ -152,6 +163,38 @@ input[type='checkbox'] {
     box-shadow: 0 0 34px -6px rgb(var(--accent-rgb) / 0.78);
   }
 
+  .glow-secondary {
+    box-shadow: 0 0 24px -10px rgb(var(--secondary-rgb) / 0.62);
+  }
+
+  /* botones de IA: destello que barre el boton e invita a pulsar */
+  .ai-glint {
+    position: relative;
+    overflow: hidden;
+  }
+  .ai-glint::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -80%;
+    width: 55%;
+    background: linear-gradient(105deg, transparent, rgb(255 255 255 / 0.22), transparent);
+    transform: skewX(-20deg);
+    animation: ai-glint-sweep 1.4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .ai-glint:hover::after {
+    animation-duration: 1.4s;
+  }
+  @keyframes ai-glint-sweep {
+    0% { left: -80%; }
+    45%, 100% { left: 130%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ai-glint::after { display: none; }
+  }
+
   /* corner ticks like a terminal window frame */
   .terminal-panel::before,
   .terminal-panel::after {
@@ -159,7 +202,7 @@ input[type='checkbox'] {
     position: absolute;
     width: 8px;
     height: 8px;
-    border-color: rgb(var(--accent-rgb) / 0.45);
+    border-color: rgb(var(--secondary-rgb) / 0.38);
     border-style: solid;
     pointer-events: none;
   }

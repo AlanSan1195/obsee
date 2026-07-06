@@ -12,7 +12,7 @@ export function ModeSelector() {
   const { mode, setMode } = useAppStore();
 
   return (
-    <Section title="modo.select" icon={<span className="text-xs">[1]</span>}>
+    <Section title="modo" icon={<span className="text-xs">[1]</span>}>
       <div className="grid grid-cols-3 gap-3">
         {modes.map((m) => {
           const selected = mode === m.id;
@@ -25,15 +25,15 @@ export function ModeSelector() {
               aria-pressed={selected}
               className={`group flex flex-col items-center gap-3 rounded-none border p-5 transition-all duration-200 ${
                 selected
-                  ? 'border-primary/60 bg-primary/10 text-primary shadow-[0_0_28px_-10px_rgba(58,155,220,0.6)]'
-                  : 'border-border bg-white/[0.03] text-text-muted hover:-translate-y-0.5 hover:border-primary/30 hover:bg-surface-hover hover:text-text'
+                  ? 'border-secondary/60 bg-secondary/10 text-secondary shadow-[0_0_28px_-10px_rgba(32,214,181,0.55)]'
+                  : 'border-border bg-surface/45 text-text-muted hover:-translate-y-0.5 hover:border-secondary/35 hover:bg-surface-hover hover:text-text'
               }`}
             >
               <span
                 className={`flex h-11 w-11 items-center justify-center border transition-colors ${
                   selected
-                    ? 'border-primary/50 bg-primary/15 text-primary'
-                    : 'border-border bg-white/5 text-text-muted group-hover:text-text'
+                    ? 'border-secondary/50 bg-secondary/15 text-secondary'
+                    : 'border-border bg-surface-hover/45 text-text-muted group-hover:text-text'
                 }`}
               >
                 <Icon className="h-5 w-5" />

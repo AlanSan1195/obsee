@@ -122,7 +122,7 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [previewConfirmOpen, setPreviewConfirmOpen] = useState(false);
   const [noiseSuppression, setNoiseSuppression] = useState(true);
-  const [monitorType, setMonitorType] = useState<OBSAudioConfig['monitorType']>('OBS_MONITORING_TYPE_NONE');
+  const [monitorType, setMonitorType] = useState<OBSAudioConfig['monitorType']>('OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT');
   const [syncOffsetMs, setSyncOffsetMs] = useState(0);
   const [duckingEnabled, setDuckingEnabled] = useState(false);
   const [selectedDuckingTarget, setSelectedDuckingTarget] = useState('');
@@ -136,7 +136,11 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
           ? prev
           : getDefaultDeviceId(obsAudioSnapshot.devices, obsAudioSnapshot.selectedDeviceId),
       );
-      setMonitorType(obsAudioSnapshot.monitorType as OBSAudioConfig['monitorType']);
+      // "Monitorizar y emitir" por defecto: es facil de olvidar y sin el no se
+      // escucha lo que sale al stream. Si OBS ya tiene otro monitoreo, se respeta.
+      setMonitorType(obsAudioSnapshot.monitorType === 'OBS_MONITORING_TYPE_NONE'
+        ? 'OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT'
+        : obsAudioSnapshot.monitorType as OBSAudioConfig['monitorType']);
       setSyncOffsetMs(obsAudioSnapshot.syncOffsetMs);
       const defaultDuckingTarget = obsAudioSnapshot.duckingTargets.find((target) => target.duckingConfigured)
         ?? obsAudioSnapshot.duckingTargets[0];
@@ -274,7 +278,7 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
   if (!obsAudioSnapshot) {
     return (
       <Section
-        title="audio.voice"
+        title="audio.voz"
         icon={<IconMic className="h-4 w-4" />}
         action={
           <button type="button" onClick={handleRefresh} className={secondaryButtonClasses}>
@@ -283,14 +287,14 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
           </button>
         }
       >
-        <div className="rounded-none border border-border bg-white/[0.02] p-4">
+        <div className="rounded-none border border-border bg-surface/45 p-4">
           <p className="text-sm text-text">
             {obsConnected
               ? 'obsee esta buscando un dispositivo Mic/Aux o una fuente Audio Input Capture para aplicar la configuracion de voz.'
               : 'Conecta OBS para detectar tu microfono y aplicar la configuracion de voz de obsee.'}
           </p>
           {detectionMessage && (
-            <p className="mt-3 text-sm text-amber-300">{detectionMessage}</p>
+            <p className="mt-3 text-sm text-warning">{detectionMessage}</p>
           )}
         </div>
       </Section>
@@ -310,7 +314,7 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
 
   return (
     <Section
-      title="audio.voice"
+      title="audio.voz"
       icon={<IconMic className="h-4 w-4" />}
       subtitle="Objetivo: que tu voz se escuche clara, fuerte y sin ruido de fondo al grabar o transmitir."
       action={
@@ -318,7 +322,7 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
           type="button"
           onClick={handleAnalyzeMic}
           disabled={isProfilingMic}
-          className={`${secondaryButtonClasses} ${isProfilingMic ? 'cursor-not-allowed opacity-60' : 'hover:border-primary/60'}`}
+          className={`${secondaryButtonClasses} ${isProfilingMic ? 'cursor-not-allowed opacity-60' : 'ai-glint hover:border-primary/60'}`}
         >
           {isProfilingMic ? <Spinner className="h-3.5 w-3.5 border-text/60 border-t-transparent" /> : <IconSparkles className="h-3.5 w-3.5" />}
           {isProfilingMic ? 'Analizando...' : 'Buscar filtros'}
@@ -334,7 +338,7 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
         />
       )}
       <div className="mb-4 grid gap-4 md:grid-cols-[1.4fr_1fr]">
-        <label className="block rounded-none border border-border bg-white/[0.02] p-4 transition-colors focus-within:border-primary/50">
+        <label className="block rounded-none border border-border bg-surface/45 p-4 transition-colors focus-within:border-primary/50">
           <span className="mb-2 block text-xs uppercase tracking-wider text-text-muted">Microfono recomendado</span>
           <select
             value={selectedDeviceId}
@@ -356,7 +360,7 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
           </span>
         </label>
 
-        <div className="rounded-none border border-border bg-white/[0.02] p-4">
+        <div className="rounded-none border border-border bg-surface/45 p-4">
           <span className="mb-2 block text-xs uppercase tracking-wider text-text-muted">Filtros</span>
           <span className={usingAi ? 'text-base font-semibold text-primary' : 'text-base font-semibold text-text-muted'}>
             {usingAi ? 'A medida (IA)' : 'Ninguno seleccionado'}
@@ -415,7 +419,7 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
                   const frames = Number(event.target.value);
                   if (frames > 0) setSyncOffsetMs(Math.round(frames * 1000 / fps));
                 }}
-                className="app-select rounded-none border border-border bg-background px-2 py-1 text-xs text-text outline-none"
+                className="app-select rounded-none border border-border bg-background  px-6 py-1 text-xs text-text outline-none"
               >
                 <option value="" className="bg-background text-text">Elegir</option>
                 {syncFrames.map((frames) => (
@@ -469,12 +473,12 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
       </div>
 
       {(obsAudioSnapshot.warnings.length > 0 || localDeviceStatus) && (
-        <div className="mb-4 flex items-start gap-3 rounded-none border border-amber-500/30 bg-black p-4 text-sm text-amber-200">
+        <div className="mb-4 flex items-start gap-3 rounded-none border border-warning/35 bg-warning/[0.06] p-4 text-sm text-warning">
           <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <p>{[localDeviceStatus, ...obsAudioSnapshot.warnings].filter(Boolean).join(' ')}</p>
             {!monoSupported && (
-              <p className="mt-3 text-amber-100">
+              <p className="mt-3 text-warning/90">
                 Para activar Mono: OBS &gt; Propiedades avanzadas de audio &gt; busca este microfono &gt; marca Mono.
               </p>
             )}
@@ -488,7 +492,7 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
         disabled={isApplying}
         className={`group flex w-full items-center justify-center gap-3 rounded-none px-6 py-4 text-base font-bold lowercase tracking-terminal transition-all duration-200 ${
           isApplying
-            ? 'cursor-not-allowed border border-border bg-white/[0.03] text-text-muted'
+            ? 'cursor-not-allowed border border-border bg-surface/45 text-text-muted'
             : 'bg-primary text-background glow-primary hover:bg-primary-hover active:scale-[0.99]'
         }`}
       >
@@ -595,9 +599,9 @@ function MicProfileCard({ profile, active, onToggle, onDismiss }: MicProfileCard
 
       <div className="grid gap-2 md:grid-cols-2">
         {rows.map((row) => (
-          <div key={row.key} className={`rounded-none border px-3 py-2 ${row.enabled ? 'border-border bg-white/[0.02]' : 'border-border/60 bg-transparent opacity-70'}`}>
+          <div key={row.key} className={`rounded-none border px-3 py-2 ${row.enabled ? 'border-border bg-surface/45' : 'border-border/60 bg-transparent opacity-70'}`}>
             <div className="flex items-center gap-2">
-              {row.enabled ? <IconCheck className="h-3.5 w-3.5 text-primary" /> : <IconX className="h-3.5 w-3.5 text-text-faint" />}
+              {row.enabled ? <IconCheck className="h-3.5 w-3.5 text-secondary" /> : <IconX className="h-3.5 w-3.5 text-text-faint" />}
               <span className="text-sm font-semibold text-text">{row.label}</span>
               <span className="ml-auto text-xs text-text-muted">{row.enabled ? row.detail : 'omitir'}</span>
             </div>

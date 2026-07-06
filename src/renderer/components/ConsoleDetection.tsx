@@ -98,7 +98,7 @@ export function ConsoleDetection() {
                 type="button"
                 onClick={handleReadCaps}
                 disabled={readingCaps}
-                className={`${secondaryButtonClasses} ${readingCaps ? 'cursor-not-allowed opacity-60' : ''}`}
+                className={`${secondaryButtonClasses} ${readingCaps ? 'cursor-not-allowed opacity-60 ' : ' ai-glint'}`}
               >
                 {readingCaps ? <Spinner className="h-3.5 w-3.5 border-text/60 border-t-transparent" /> : <IconActivity className="h-3.5 w-3.5" />}
                 {readingCaps ? 'Leyendo...' : 'Leer capacidad real (OBS)'}

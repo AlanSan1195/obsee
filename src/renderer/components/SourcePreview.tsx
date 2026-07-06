@@ -2,14 +2,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useAppAPI } from '../hooks/useAppAPI';
 
 type SourcePreviewProps = {
-  sourceName: string;
+  sourceName: string | null;
   intervalMs?: number;
+  // Modo persistente: nunca se oculta; sin captura muestra el lienzo negro con leyenda.
+  persistent?: boolean;
 };
 
 // Vista previa de baja frecuencia: consulta una captura de OBS (~1 fps) para que
-// el usuario confirme "asi se ve" sin abrir OBS. Si OBS no puede capturar (kind
-// sin soporte, permisos), se oculta de forma silenciosa.
-export function SourcePreview({ sourceName, intervalMs = 1200 }: SourcePreviewProps) {
+// el usuario confirme "asi se ve" sin abrir OBS. Funciona con fuentes y con
+// escenas completas. Si OBS no puede capturar (kind sin soporte, permisos), se
+// oculta de forma silenciosa — salvo en modo persistente.
+export function SourcePreview({ sourceName, intervalMs = 1200, persistent = false }: SourcePreviewProps) {
   const { getSourceScreenshot } = useAppAPI();
   const [imageData, setImageData] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -21,12 +24,14 @@ export function SourcePreview({ sourceName, intervalMs = 1200 }: SourcePreviewPr
   screenshotRef.current = getSourceScreenshot;
 
   useEffect(() => {
+    setImageData(null);
+    setFailed(false);
+    if (!sourceName) return undefined;
+
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     let failures = 0;
     let gotImage = false;
-    setImageData(null);
-    setFailed(false);
 
     const tick = async () => {
       if (!active) return;
@@ -62,14 +67,27 @@ export function SourcePreview({ sourceName, intervalMs = 1200 }: SourcePreviewPr
     };
   }, [sourceName, intervalMs]);
 
-  if (failed) return null;
+  if (failed && !persistent) return null;
+
+  const showImage = Boolean(imageData && sourceName && !failed);
+  const waiting = Boolean(sourceName && !imageData && !failed);
 
   return (
-    <div className="flex aspect-video w-full items-center justify-center overflow-hidden border border-border bg-black">
-      {imageData ? (
-        <img src={imageData} alt={`Vista previa de ${sourceName}`} className="h-full w-full object-contain" />
+    <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden border border-border bg-black">
+      {showImage ? (
+        <>
+          <img src={imageData!} alt={`Vista previa de ${sourceName}`} className="h-full w-full object-contain" />
+          {persistent && (
+            <span className="absolute left-2 top-2 flex items-center gap-1.5 border border-border bg-black/70 px-2 py-0.5 text-[0.65rem] lowercase tracking-terminal text-text-muted">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse-dot bg-primary" aria-hidden="true" />
+              {sourceName}
+            </span>
+          )}
+        </>
       ) : (
-        <span className="text-xs lowercase tracking-terminal text-text-faint">cargando vista previa…</span>
+        <span className="px-4 text-center text-xs lowercase tracking-terminal text-text-faint">
+          {persistent && !waiting ? 'asi se vera tu stream' : 'cargando vista previa…'}
+        </span>
       )}
     </div>
   );

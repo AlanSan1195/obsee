@@ -31,7 +31,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block rounded-none border border-border bg-white/[0.02] p-4 transition-colors focus-within:border-primary/50">
+    <label className="block rounded-none border border-border bg-surface/45 p-4 transition-colors focus-within:border-primary/50">
       <span className="mb-2 block text-xs uppercase tracking-wider text-text-muted">{label}</span>
       {children}
     </label>
@@ -75,7 +75,7 @@ function SelectField<T extends string | number>({
         onKeyDown={(event) => {
           if (event.key === 'Escape') setOpen(false);
         }}
-        className="flex min-h-9 w-full items-center justify-between gap-3 rounded-none border border-transparent bg-white/[0.02] px-3 py-2 text-left text-base font-medium text-text transition-colors hover:border-border hover:bg-white/[0.02] focus:border-primary/60 focus:outline-none"
+        className="flex min-h-9 w-full items-center justify-between gap-3 rounded-none border border-transparent bg-surface-hover/45 px-3 py-2 text-left text-base font-medium text-text transition-colors hover:border-border hover:bg-surface-hover focus:border-primary/60 focus:outline-none"
       >
         <span className="min-w-0 truncate">{displayValue}</span>
         <svg
@@ -111,12 +111,12 @@ function SelectField<T extends string | number>({
                 }}
                 className={`flex w-full items-center justify-between rounded-none px-3 py-2 text-left text-sm font-medium transition-colors ${
                   selected
-                    ? 'bg-primary/15 text-primary'
-                    : 'text-text hover:bg-white/[0.04]'
+                    ? 'bg-secondary/15 text-secondary'
+                    : 'text-text hover:bg-surface-hover'
                 }`}
               >
                 <span>{String(option).toUpperCase()}</span>
-                {selected && <span className="text-xs text-primary">Actual</span>}
+                {selected && <span className="text-xs text-secondary">Actual</span>}
               </button>
             );
           })}
@@ -274,7 +274,7 @@ export function Recommendations() {
 
   if (isAnalyzing) {
     return (
-      <Section title="config.recommended" icon={<IconSliders className="h-4 w-4" />}>
+      <Section title="config.recomendada" icon={<IconSliders className="h-4 w-4" />}>
         <div className="flex items-center gap-3">
           <Spinner />
           <span className="text-sm text-text-muted">Obteniendo recomendaciones...</span>
@@ -304,14 +304,14 @@ export function Recommendations() {
   };
 
   return (
-    <Section title="config.recommended" icon={<IconSliders className="h-4 w-4" />} accent>
+    <Section title="config.recomendada" icon={<IconSliders className="h-4 w-4" />} accent>
       {recommendation.source === 'local' && (
-        <div className="mb-4 flex items-start gap-3 rounded-none border border-amber-500/30 bg-black p-4 text-sm text-amber-200">
+        <div className="mb-4 flex items-start gap-3 rounded-none border border-warning/35 bg-warning/[0.06] p-4 text-sm text-warning">
           <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <span>La IA integrada no respondio o alcanzo su limite. Esta es una recomendacion local de respaldo generada por obsee.</span>
         </div>
       )}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-none border border-border bg-white/[0.02] p-3 text-xs text-text-muted">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-none border border-border bg-surface/45 p-3 text-xs text-text-muted">
         <span className="font-semibold uppercase tracking-wider text-primary">
           {getSourceLabel(recommendation.source)}
         </span>

@@ -815,7 +815,8 @@ export function validateConsoleProfileResponse(value: unknown): ValidationResult
           : '1920x1080',
         captureFps: Math.round(clampNumber(p.captureFps, 1, 240, 60)),
         consoleSettings: Array.isArray(p.consoleSettings)
-          ? p.consoleSettings.filter(isNonEmptyString).map((s) => s.trim().slice(0, 200)).slice(0, 8)
+          // La IA a veces numera los pasos ("1. ..."); se quita porque la UI ya los numera.
+          ? p.consoleSettings.filter(isNonEmptyString).map((s) => s.trim().replace(/^\d+[.)]\s*/, '').slice(0, 200)).slice(0, 8)
           : [],
         sources: Array.isArray(p.sources)
           ? p.sources.filter(isNonEmptyString).map((s) => s.trim()).slice(0, 6)

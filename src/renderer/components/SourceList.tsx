@@ -65,7 +65,7 @@ export function SourceList({ sceneName, onAddSource }: SourceListProps) {
                 type="button"
                 onClick={() => setPendingDelete(item)}
                 aria-label={`Eliminar fuente ${item.sourceName}`}
-                className="shrink-0 p-1 text-text-faint transition-colors hover:text-red-400"
+                className="shrink-0 p-1 text-text-faint transition-colors hover:text-danger"
               >
                 <IconX className="h-3.5 w-3.5" />
               </button>

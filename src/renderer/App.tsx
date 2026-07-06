@@ -17,9 +17,6 @@ import { ImportButton } from './components/ImportButton';
 import { StatusBar } from './components/StatusBar';
 import { appAPI } from './lib/app-api';
 import { IconAlert, IconX } from './components/ui';
-import packageJson from '../../package.json';
-
-const APP_VERSION = packageJson.version;
 
 type TabIndex = 0 | 1 | 2 | 3;
 
@@ -79,7 +76,7 @@ export default function App() {
 
   const tabs = [
     { label: 'conectar', blocked: false, completed: obsConnected },
-    { label: 'setup', blocked: !obsConnected, completed: obsConnected && !!recommendation },
+    { label: 'ajustes', blocked: !obsConnected, completed: obsConnected && !!recommendation },
     { label: 'deteccion', blocked: !obsConnected, completed: false },
     { label: 'escenas', blocked: !obsConnected, completed: false },
   ] as const;
@@ -95,19 +92,18 @@ export default function App() {
         </span>
         <span
           className={`flex items-center gap-1.5 border px-2 py-0.5 ${
-            obsConnected ? 'border-primary/40 text-primary' : 'border-border text-text-muted'
+            obsConnected ? 'border-secondary/40 text-secondary glow-secondary' : 'border-border text-text-muted'
           }`}
         >
           <span
-            className={`inline-block h-1.5 w-1.5 rounded-full ${obsConnected ? 'animate-pulse-dot bg-primary' : 'bg-text-faint'}`}
+            className={`inline-block h-1.5 w-1.5 rounded-full ${obsConnected ? 'animate-pulse-dot bg-secondary' : 'bg-text-faint'}`}
           />
-          {obsConnected ? 'online' : 'offline'}
+          {obsConnected ? 'conectado' : 'sin conexion'}
         </span>
         <span className="hidden h-3 w-px bg-border sm:block" />
-        <MetaItem label="mode" value={mode ? modeLabels[mode] : '—'} />
-        <MetaItem label="target" value={platform ?? '—'} />
-        <MetaItem label="os" value={systemInfo ? systemInfo.os.distro.toLowerCase() : '—'} />
-        <span className="ml-auto text-text-faint">v{APP_VERSION}</span>
+        <MetaItem label="modo" value={mode ? modeLabels[mode] : '—'} />
+        <MetaItem label="destino" value={platform ?? '—'} />
+        <MetaItem label="so" value={systemInfo ? systemInfo.os.distro.toLowerCase() : '—'} />
       </header>
 
       {/* stepper */}
@@ -136,7 +132,7 @@ export default function App() {
                     isActive
                       ? 'border-primary bg-primary text-background glow-primary'
                       : tab.completed
-                        ? 'border-primary/50 text-primary'
+                        ? 'border-secondary/50 bg-secondary/[0.06] text-secondary glow-secondary'
                         : tab.blocked
                           ? 'border-text-faint/30'
                           : 'border-text-muted/40 group-hover:border-text-muted'
@@ -154,12 +150,12 @@ export default function App() {
       {error && (
         <div
           role="alert"
-          className="mb-6 flex items-center justify-between gap-4 border border-red-500/40 bg-black p-4"
+          className="mb-6 flex items-center justify-between gap-4 border border-danger/45 bg-danger/[0.06] p-4"
         >
           <div className="flex items-center gap-3">
-            <IconAlert className="h-5 w-5 shrink-0 text-red-400" />
-            <span className="text-sm text-red-300">
-              <span className="text-red-500/70">err: </span>
+            <IconAlert className="h-5 w-5 shrink-0 text-danger" />
+            <span className="text-sm text-danger">
+              <span className="text-danger/70">err: </span>
               {error}
             </span>
           </div>
@@ -167,7 +163,7 @@ export default function App() {
             type="button"
             onClick={() => setError(null)}
             aria-label="Cerrar mensaje de error"
-            className="p-1.5 text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300"
+            className="p-1.5 text-danger transition-colors hover:bg-danger/15 hover:text-danger"
           >
             <IconX className="h-4 w-4" />
           </button>
@@ -189,7 +185,7 @@ export default function App() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 className="ml-2 h-[0.72em] w-[0.72em] text-primary"
-                style={{ filter: 'drop-shadow(0 0 8px rgba(59, 111, 224, 0.7))' }}
+                style={{ filter: 'drop-shadow(0 0 8px rgba(58, 155, 220, 0.7))' }}
               >
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M5 6a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -12" />
@@ -208,15 +204,21 @@ export default function App() {
               analiza tu equipo, detecta tu hardware y hace el mejor match de configuracion para tu OBS.
             </p>
 
+            <ConnectPanel />
+
+            {obsConnected && (
+              <p className="w-full max-w-md text-center text-sm text-text-muted">
+                OBS conectado <span className="text-secondary">✓</span> — continua con los ajustes de tu stream.
+              </p>
+            )}
+
             {/* aviso beta, sin ensuciar el hero */}
-            <div className="flex w-full max-w-md items-center gap-2 border border-border bg-primary/[0.03] px-4 py-3 text-left text-xs leading-relaxed text-text-muted">
-              <span className="border border-primary/40 px-1.5 py-px text-[0.6rem] font-bold uppercase tracking-terminal text-primary">
+            <div className="flex w-full max-w-md items-center gap-2 border border-warning/35 bg-warning/[0.06] px-4 py-3 text-left text-xs leading-relaxed text-text-muted">
+              <span className="border border-warning/45 px-1.5 py-px text-[0.6rem] font-bold uppercase tracking-terminal text-warning">
                 beta
               </span>
               <span>version en prueba: revisa en OBS los ajustes aplicados antes de un directo importante.</span>
             </div>
-
-            <ConnectPanel />
           </div>
         )}
 
@@ -278,6 +280,18 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {obsConnected && activeTab === 0 && (
+        <div className="flex justify-end pt-6">
+          <button
+            type="button"
+            onClick={() => setActiveTab(1)}
+            className="flex items-center gap-2 rounded-none bg-primary px-6 py-3 text-sm font-bold lowercase tracking-terminal text-background glow-primary transition-all hover:bg-primary-hover active:scale-[0.99]"
+          >
+            siguiente →
+          </button>
+        </div>
+      )}
 
       <StatusBar />
     </div>

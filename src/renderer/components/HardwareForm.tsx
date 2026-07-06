@@ -3,7 +3,7 @@ import { detectHardwareHints, loadHardwareOverrides, saveHardwareOverrides } fro
 import { Section } from './ui';
 
 // Capacidades que existen de fabrica (PC y Apple Silicon)
-const RAM_SIZES = [4, 8, 12, 16, 18, 24, 32, 36, 48, 64, 96, 128];
+const RAM_SIZES = [4, 8, 12, 16, 24, 32, 36, 48, 64, 96, 128];
 
 function ramOptions(current: string): number[] {
   const value = Number(current);
@@ -28,7 +28,7 @@ export function HardwareForm() {
 
   return (
     <Section
-      title="hardware.setup"
+      title="hardware.config"
       icon={<span className="text-xs">[hw]</span>}
       subtitle="El navegador detecta tu GPU automaticamente. Completa el CPU y la RAM para que la recomendacion sea precisa."
     >
@@ -39,7 +39,7 @@ export function HardwareForm() {
             <span className="text-primary">{hints.gpu.model}</span>
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="text-text-faint">vendor</span>
+            <span className="text-text-faint">marca</span>
             <span className="text-text">{hints.gpu.vendor.toLowerCase()}</span>
           </span>
           <span className="flex items-center gap-1.5">

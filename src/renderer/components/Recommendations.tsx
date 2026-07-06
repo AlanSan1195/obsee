@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store';
 import { getLocalRecommendationExplanation } from '../../shared/localRecommendation';
+import { appAPI } from '../lib/app-api';
 import type { AIRecommendation, AIRecommendationField, AIRecommendationSettings } from '../../shared/types';
 import { IconAlert, IconSliders, Section, Spinner } from './ui';
 
@@ -229,9 +230,8 @@ export function Recommendations() {
     };
 
     const timeoutId = window.setTimeout(async () => {
-      const explanation = await window.electronAPI?.ai.explainRecommendation(request)
-        .catch(() => getLocalRecommendationExplanation(request))
-        ?? getLocalRecommendationExplanation(request);
+      const explanation = await appAPI.ai.explainRecommendation(request)
+        .catch(() => getLocalRecommendationExplanation(request));
 
       if (explanationRequestIdRef.current !== requestId) return;
 

@@ -7,6 +7,7 @@ import { SourceTargetSelector } from './components/SourceTargetSelector';
 import { ConsoleSelector } from './components/ConsoleSelector';
 import { ConsoleDetection } from './components/ConsoleDetection';
 import { ConsoleReport } from './components/ConsoleReport';
+import { HardwareForm } from './components/HardwareForm';
 import { Recommendations } from './components/Recommendations';
 import { OBSComparison } from './components/OBSComparison';
 import { AudioConfiguration } from './components/AudioConfiguration';
@@ -14,7 +15,7 @@ import { ScenesPanel } from './components/ScenesPanel';
 import { ConnectPanel } from './components/ConnectPanel';
 import { ImportButton } from './components/ImportButton';
 import { StatusBar } from './components/StatusBar';
-import { useElectronAPI } from './hooks/useElectronAPI';
+import { appAPI } from './lib/app-api';
 import { IconAlert, IconX } from './components/ui';
 import packageJson from '../../package.json';
 
@@ -57,9 +58,7 @@ export default function App() {
   } = useAppStore();
 
   useEffect(() => {
-    if (!window.electronAPI) return undefined;
-
-    return window.electronAPI.obs.onConnectionChanged((status) => {
+    return appAPI.obs.onConnectionChanged((status) => {
       setObsConnected(status.connected);
       setObsMessage(status.message);
 
@@ -193,6 +192,7 @@ export default function App() {
               <ModeSelector />
               <PlatformSelector />
             </div>
+            <HardwareForm />
             <SourceTargetSelector />
             {analysisTarget === 'console' && (
               <>

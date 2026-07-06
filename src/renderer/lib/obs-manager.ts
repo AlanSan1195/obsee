@@ -17,8 +17,8 @@ import type {
   SceneSourcesSnapshot,
   ScenesSnapshot,
   SourceKindFriendly,
-} from '../shared/types';
-import { parseResolution } from '../shared/validation';
+} from '../../shared/types';
+import { parseResolution } from '../../shared/validation';
 import {
   areObsrecFiltersConfigured,
   collectDuckingInputCandidates,

@@ -1,13 +1,10 @@
 import { useAppStore } from '../store';
 import { inferObsUsage } from '../../shared/obsUsage';
-import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationRequest, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, BeginGuidedSourceResult, CameraLayout, CaptureCapabilities, ConsoleProfileRequest, ConsoleProfileResponse, CreateGuidedSourceConfig, MicProfileRequest, MicProfileResponse, OBSBackup, OBSAudioConfig, OBSAudioSettingsSnapshot, OBSConfig, OBSConnectionSettings, OBSSettingsSnapshot, PeripheralsSnapshot, ResolvedSourceKind, SceneSourcesSnapshot, ScenesSnapshot, SetCameraLayoutInput, SystemInfo } from '../../shared/types';
+import { appAPI } from '../lib/app-api';
+import type { AIRecommendationExplanationRequest, AIRecommendationRequest, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, BeginGuidedSourceResult, CameraLayout, CaptureCapabilities, ConsoleProfileRequest, ConsoleProfileResponse, CreateGuidedSourceConfig, MicProfileRequest, MicProfileResponse, OBSAudioConfig, OBSConfig, OBSConnectionSettings, PeripheralsSnapshot } from '../../shared/types';
 
 function getElectronAPI() {
-  if (!window.electronAPI) {
-    throw new Error('obsee debe abrirse en la app de escritorio de Electron para controlar OBS. La vista del navegador solo muestra la interfaz, pero no puede conectarse a OBS WebSocket.');
-  }
-
-  return window.electronAPI;
+  return appAPI;
 }
 
 export function useElectronAPI() {
@@ -95,10 +92,12 @@ export function useElectronAPI() {
   const getPeripherals = async (): Promise<PeripheralsSnapshot | null> => {
     try {
       const peripherals = await getElectronAPI().system.getPeripherals();
-      console.log('[peripherals] Detectados:', {
-        capturadoras: peripherals.captureDevices,
-        monitores: peripherals.displays,
-      });
+      if (import.meta.env.DEV) {
+        console.log('[peripherals] Detectados:', {
+          capturadoras: peripherals.captureDevices,
+          monitores: peripherals.displays,
+        });
+      }
       setPeripherals(peripherals);
       return peripherals;
     } catch (error) {
@@ -112,13 +111,15 @@ export function useElectronAPI() {
     setError(null);
     try {
       const profile = await getElectronAPI().ai.profileConsole(request);
-      const navSources = profile.profile?.sources ?? [];
-      console.log('[console-profile] Respuesta IA:', {
-        fuentesNavegadas: navSources.length > 0 ? navSources : 'NO (sources vacio: la IA no navego specs oficiales)',
-        capturaRecomendada: `${profile.profile?.captureResolution} @${profile.profile?.captureFps}fps`,
-        bottleneck: profile.profile?.bottleneck,
-        origen: profile.source,
-      });
+      if (import.meta.env.DEV) {
+        const navSources = profile.profile?.sources ?? [];
+        console.log('[console-profile] Respuesta IA:', {
+          fuentesNavegadas: navSources.length > 0 ? navSources : 'NO (sources vacio: la IA no navego specs oficiales)',
+          capturaRecomendada: `${profile.profile?.captureResolution} @${profile.profile?.captureFps}fps`,
+          bottleneck: profile.profile?.bottleneck,
+          origen: profile.source,
+        });
+      }
       setConsoleProfile(profile);
       // Reusa el flujo de aplicar de OBS: la recomendacion alimenta OBSComparison/ImportButton.
       setRecommendation({
@@ -372,10 +373,6 @@ export function useElectronAPI() {
     return getElectronAPI().obs.sourceScreenshot({ sourceName, maxWidth });
   };
 
-  const pickImageFile = async () => {
-    return getElectronAPI().obs.pickImageFile();
-  };
-
   const getLastBackup = async () => {
     return getElectronAPI().obs.getLastBackup();
   };
@@ -423,7 +420,6 @@ export function useElectronAPI() {
     renameSource,
     setSourceEnabled,
     getSourceScreenshot,
-    pickImageFile,
     profileMicrophone,
     getPeripherals,
     getCaptureCapabilities,
@@ -431,50 +427,3 @@ export function useElectronAPI() {
   };
 }
 
-declare global {
-  interface Window {
-    electronAPI: {
-      obs: {
-        connect: (settings: OBSConnectionSettings) => Promise<{ success: boolean; message: string }>;
-        disconnect: () => Promise<{ success: boolean; message: string }>;
-        getStatus: () => Promise<{ connected: boolean; message: string }>;
-        getSettingsSnapshot: () => Promise<{ success: boolean; message: string; snapshot?: OBSSettingsSnapshot }>;
-        getAudioSnapshot: () => Promise<{ success: boolean; message: string; snapshot?: OBSAudioSettingsSnapshot }>;
-        getLastBackup: () => Promise<{ success: boolean; message: string; backup?: OBSBackup }>;
-        restoreLastBackup: () => Promise<{ success: boolean; message: string; warnings: string[] }>;
-        configure: (config: OBSConfig) => Promise<{ success: boolean; message: string }>;
-        configureAudio: (config: OBSAudioConfig) => Promise<{ success: boolean; message: string; snapshot?: OBSAudioSettingsSnapshot; warnings: string[] }>;
-        getScenes: () => Promise<{ success: boolean; message: string; snapshot?: ScenesSnapshot }>;
-        createScene: (name: string) => Promise<{ success: boolean; message: string; snapshot?: ScenesSnapshot }>;
-        setCurrentScene: (name: string) => Promise<{ success: boolean; message: string }>;
-        removeScene: (name: string) => Promise<{ success: boolean; message: string; snapshot?: ScenesSnapshot }>;
-        getSourceKinds: () => Promise<{ success: boolean; message: string; resolved?: ResolvedSourceKind[] }>;
-        getSceneSources: (name: string) => Promise<{ success: boolean; message: string; snapshot?: SceneSourcesSnapshot }>;
-        beginGuidedSource: (arg: BeginGuidedSourceInput) => Promise<BeginGuidedSourceResult>;
-        applyGuidedSourceDevice: (arg: ApplyGuidedSourceDeviceInput) => Promise<{ success: boolean; message: string; warnings: string[] }>;
-        setCameraLayout: (arg: SetCameraLayoutInput) => Promise<{ success: boolean; message: string; warnings: string[] }>;
-        setSourceToBottom: (arg: { sceneName: string; sceneItemId: number }) => Promise<{ success: boolean; message: string }>;
-        createCameraScene: (arg: { sceneName: string; inputName: string; deviceId: string; propertyName: string }) => Promise<{ success: boolean; message: string; sceneName?: string; warnings: string[] }>;
-        cancelGuidedSource: (name: string) => Promise<{ success: boolean; message: string }>;
-        createGuidedSource: (config: CreateGuidedSourceConfig) => Promise<{ success: boolean; message: string; sceneItemId?: number; warnings: string[] }>;
-        removeSource: (name: string) => Promise<{ success: boolean; message: string }>;
-        renameSource: (arg: { inputName: string; newInputName: string }) => Promise<{ success: boolean; message: string }>;
-        setSourceEnabled: (arg: { sceneName: string; sceneItemId: number; enabled: boolean }) => Promise<{ success: boolean; message: string }>;
-        sourceScreenshot: (arg: { sourceName: string; maxWidth?: number }) => Promise<{ success: boolean; message: string; imageData?: string }>;
-        getCaptureCapabilities: (arg: { deviceName?: string }) => Promise<{ success: boolean; message: string; capabilities?: CaptureCapabilities }>;
-        pickImageFile: () => Promise<{ canceled: boolean; filePath?: string }>;
-        onConnectionChanged: (callback: (status: { connected: boolean; message: string }) => void) => () => void;
-      };
-      system: {
-        getInfo: () => Promise<SystemInfo>;
-        getPeripherals: () => Promise<PeripheralsSnapshot>;
-      };
-      ai: {
-        getRecommendation: (request: AIRecommendationRequest) => Promise<AIRecommendation>;
-        explainRecommendation: (request: AIRecommendationExplanationRequest) => Promise<AIRecommendationExplanation>;
-        profileMicrophone: (request: MicProfileRequest) => Promise<MicProfileResponse>;
-        profileConsole: (request: ConsoleProfileRequest) => Promise<ConsoleProfileResponse>;
-      };
-    };
-  }
-}

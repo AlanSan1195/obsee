@@ -1,8 +1,6 @@
 import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationRequest, ConsoleProfileRequest, ConsoleProfileResponse, MicProfileRequest, MicProfileResponse } from '../../shared/types';
 import { validateAIRecommendation, validateAIRecommendationExplanation, validateConsoleProfileResponse, validateMicProfileResponse } from '../../shared/validation';
-import { getInstallId } from '../install-id';
-
-const defaultApiUrl = 'https://obsee.vercel.app';
+import { getInstallId } from './install-id';
 
 export class RemoteAIError extends Error {
   constructor(message: string, public readonly status?: number) {
@@ -12,10 +10,11 @@ export class RemoteAIError extends Error {
 }
 
 function getApiBaseUrl(): string {
-  return (process.env.OBSREC_AI_API_URL || defaultApiUrl).replace(/\/+$/, '');
+  // '' = mismo origen (produccion en Vercel); en dev el proxy de Vite redirige /api
+  return (import.meta.env.VITE_AI_API_URL ?? '').replace(/\/+$/, '');
 }
 
-async function postToRemoteAI(pathname: string, body: unknown): Promise<unknown> {
+export async function postToRemoteAI(pathname: string, body: unknown): Promise<unknown> {
   const installId = await getInstallId();
   const response = await fetch(`${getApiBaseUrl()}${pathname}`, {
     method: 'POST',

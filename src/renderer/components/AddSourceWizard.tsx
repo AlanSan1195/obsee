@@ -11,7 +11,7 @@ type AddSourceWizardProps = {
   onCreated: () => void;
 };
 
-type WizardStep = 'choose-what' | 'choose-device' | 'camera-layout' | 'confirm';
+type WizardStep = 'choose-what' | 'image-path' | 'choose-device' | 'camera-layout' | 'confirm';
 
 type FriendlyCard = {
   friendly: SourceKindFriendly;
@@ -44,7 +44,6 @@ export function AddSourceWizard({ sceneName, onClose, onCreated }: AddSourceWiza
     refreshScenes,
     createGuidedSource,
     renameSource,
-    pickImageFile,
   } = useElectronAPI();
 
   const [step, setStep] = useState<WizardStep>('choose-what');
@@ -57,6 +56,7 @@ export function AddSourceWizard({ sceneName, onClose, onCreated }: AddSourceWiza
   const [propertyName, setPropertyName] = useState<string | undefined>(undefined);
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
   const [nameDraft, setNameDraft] = useState('');
+  const [imagePath, setImagePath] = useState('');
 
   const kindByFriendly = (value: SourceKindFriendly): ResolvedSourceKind | undefined =>
     availableSourceKinds?.find((kind) => kind.friendly === value);
@@ -73,30 +73,10 @@ export function AddSourceWizard({ sceneName, onClose, onCreated }: AddSourceWiza
     setLocalError('');
 
     if (value === 'image') {
-      setBusy(true);
-      try {
-        const picked = await pickImageFile();
-        if (picked.canceled || !picked.filePath) {
-          setBusy(false);
-          return;
-        }
-        const sourceName = picked.filePath.split(/[\\/]/).pop() || 'Imagen';
-        const result = await createGuidedSource({
-          sceneName,
-          friendly: 'image',
-          sourceName,
-          imagePath: picked.filePath,
-          fitToCanvas: true,
-        });
-        if (result.success) {
-          onCreated();
-          onClose();
-        } else {
-          setLocalError(result.message);
-        }
-      } finally {
-        setBusy(false);
-      }
+      // El navegador no expone rutas absolutas de archivos: se pide la ruta a mano
+      // porque OBS necesita la ubicacion real de la imagen en el disco.
+      setFriendly('image');
+      setStep('image-path');
       return;
     }
 
@@ -119,6 +99,34 @@ export function AddSourceWizard({ sceneName, onClose, onCreated }: AddSourceWiza
         setStep('choose-device');
       } else {
         setStep('confirm');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCreateImage = async () => {
+    const trimmedPath = imagePath.trim();
+    if (!trimmedPath) {
+      setLocalError('Escribe la ruta de la imagen.');
+      return;
+    }
+    setBusy(true);
+    setLocalError('');
+    try {
+      const sourceName = trimmedPath.split(/[\\/]/).pop() || 'Imagen';
+      const result = await createGuidedSource({
+        sceneName,
+        friendly: 'image',
+        sourceName,
+        imagePath: trimmedPath,
+        fitToCanvas: true,
+      });
+      if (result.success) {
+        onCreated();
+        onClose();
+      } else {
+        setLocalError(result.message);
       }
     } finally {
       setBusy(false);
@@ -240,6 +248,7 @@ export function AddSourceWizard({ sceneName, onClose, onCreated }: AddSourceWiza
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold tracking-tight text-text">
             {step === 'choose-what' && 'Que quieres mostrar?'}
+            {step === 'image-path' && 'Donde esta la imagen?'}
             {step === 'choose-device' && (isConsole ? 'Elige tu tarjeta de captura' : 'Elige cual')}
             {step === 'camera-layout' && 'Como quieres usar la camara?'}
             {step === 'confirm' && 'Listo para agregar'}
@@ -273,6 +282,33 @@ export function AddSourceWizard({ sceneName, onClose, onCreated }: AddSourceWiza
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {step === 'image-path' && (
+          <div className="space-y-3">
+            <label className="block space-y-1.5">
+              <span className="text-xs lowercase tracking-terminal text-text-faint">ruta del archivo de imagen</span>
+              <input
+                type="text"
+                value={imagePath}
+                onChange={(event) => setImagePath(event.target.value)}
+                placeholder="C:\Users\tu-usuario\Pictures\logo.png"
+                spellCheck={false}
+                className="w-full rounded-none border border-border bg-background px-3 py-2.5 text-sm text-text focus:border-primary focus:outline-none"
+              />
+            </label>
+            <p className="text-xs text-text-muted">
+              Escribe la ruta completa de la imagen en la computadora donde corre OBS. Tip: en el explorador de archivos, clic derecho sobre la imagen y copia su ruta.
+            </p>
+            <div className="flex justify-between gap-3 pt-1">
+              <button type="button" className={secondaryButton} onClick={handleBackToChoose} disabled={busy}>
+                Atras
+              </button>
+              <button type="button" className={primaryButton} onClick={handleCreateImage} disabled={busy || imagePath.trim().length === 0}>
+                {busy ? <Spinner className="h-4 w-4" /> : 'Agregar'}
+              </button>
+            </div>
           </div>
         )}
 

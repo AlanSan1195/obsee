@@ -1,4 +1,4 @@
-import type { ResolvedSourceKind, SourceKindFriendly } from '../shared/types';
+import type { ResolvedSourceKind, SourceKindFriendly } from '../../shared/types';
 
 // Candidatos de inputKind por categoria amigable, ordenados por preferencia.
 // Se filtran contra los kinds reales que reporta OBS (GetInputKindList), igual

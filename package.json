@@ -2,25 +2,18 @@
   "name": "obsee",
   "version": "1.1.0",
   "description": "OBS Auto Configuration Tool for Streamers",
-  "main": "dist/main/index.js",
   "scripts": {
-    "dev": "concurrently \"pnpm run dev:vite\" \"pnpm run dev:electron\"",
-    "dev:vite": "vite",
-    "dev:electron": "pnpm run build:main && wait-on tcp:5173 && electron . --dev",
-    "build": "pnpm run build:main && pnpm run build:renderer && electron-builder",
-    "build:main": "node scripts/clean-main-dist.mjs && tsc -p tsconfig.main.json",
-    "build:renderer": "vite build",
-    "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.json --noEmit",
-    "typecheck:api": "tsc --noEmit --target ES2022 --module CommonJS --moduleResolution node --esModuleInterop --skipLibCheck --strict api/health.ts api/recommendation.ts api/explanation.ts api/audio-profile.ts api/console-profile.ts api/_lib/groq.ts api/_lib/http.ts api/_lib/rate-limit.ts",
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:api": "tsc --noEmit --target ES2022 --module CommonJS --moduleResolution node --esModuleInterop --skipLibCheck --strict api/health.ts api/recommendation.ts api/explanation.ts api/audio-profile.ts api/console-profile.ts api/web-search.ts api/_lib/groq.ts api/_lib/http.ts api/_lib/rate-limit.ts",
     "test:ai-backend": "node scripts/test-ai-backend.mjs",
     "lint": "eslint src",
     "test": "vitest run"
   },
   "dependencies": {
-    "dotenv": "^17.4.2",
     "groq-sdk": "^0.5.0",
     "obs-websocket-js": "^5.0.8",
-    "systeminformation": "^5.23.5",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
@@ -30,9 +23,6 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.20",
-    "concurrently": "^10.0.3",
-    "electron": "^42.4.0",
-    "electron-builder": "^26.15.2",
     "eslint": "^10.4.0",
     "postcss": "^8.4.40",
     "react": "^19.0.0",
@@ -41,28 +31,6 @@
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.60.0",
     "vite": "^5.4.0",
-    "vitest": "^3.2.6",
-    "wait-on": "^8.0.0"
-  },
-  "build": {
-    "appId": "com.obsee.app",
-    "productName": "obsee",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/main/**/*",
-      "dist/shared/**/*",
-      "dist/renderer/**/*",
-      "package.json"
-    ],
-    "mac": {
-      "target": "dmg",
-      "artifactName": "obsee-Mac.${ext}"
-    },
-    "win": {
-      "target": "nsis",
-      "artifactName": "obsee-Windows-Setup.${ext}"
-    }
+    "vitest": "^3.2.6"
   }
 }

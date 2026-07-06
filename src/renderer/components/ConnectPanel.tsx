@@ -33,7 +33,7 @@ export function ConnectPanel() {
       title="obs.connect"
       accent
       icon={<IconPlug className="h-4 w-4" />}
-      subtitle="Conecta OBS primero. Activa el servidor WebSocket en OBS: Herramientas > Ajustes del servidor WebSocket."
+      subtitle="OBS debe estar abierto en esta misma computadora con el servidor WebSocket activado: Herramientas > Ajustes del servidor WebSocket. Usa Chrome, Edge o Firefox (Safari no puede conectarse a OBS)."
     >
       <div className="space-y-4">
         <label className="block">

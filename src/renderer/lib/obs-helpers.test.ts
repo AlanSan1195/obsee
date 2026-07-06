@@ -9,7 +9,7 @@ import {
   obsrecFilterNames,
   scoreAudioDevice,
 } from './obs-helpers';
-import type { OBSAudioConfig, OBSAudioFilterSnapshot } from '../shared/types';
+import type { OBSAudioConfig, OBSAudioFilterSnapshot } from '../../shared/types';
 
 function defaultObsrecFilters(): OBSAudioFilterSnapshot[] {
   return [

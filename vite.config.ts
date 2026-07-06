@@ -7,7 +7,7 @@ export default defineConfig({
   root: '.',
   base: './',
   build: {
-    outDir: 'dist/renderer',
+    outDir: 'dist',
     emptyOutDir: true,
   },
   resolve: {
@@ -19,5 +19,12 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // En dev no hay funciones serverless locales: /api va a produccion
+    proxy: {
+      '/api': {
+        target: 'https://obsee.vercel.app',
+        changeOrigin: true,
+      },
+    },
   },
 });

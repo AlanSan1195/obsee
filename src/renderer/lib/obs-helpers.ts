@@ -1,4 +1,4 @@
-import type { OBSAudioConfig, OBSAudioFilterSnapshot, OBSPlatform } from '../shared/types';
+import type { OBSAudioConfig, OBSAudioFilterSnapshot, OBSPlatform } from '../../shared/types';
 
 export const defaultAudioConfig = {
   gainDb: 10,

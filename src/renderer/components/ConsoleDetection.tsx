@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useAppStore } from '../store';
-import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useAppAPI } from '../hooks/useAppAPI';
 import { IconActivity, IconMonitor, IconRefresh, Section, Spinner } from './ui';
 
 const secondaryButtonClasses =
@@ -19,7 +19,7 @@ export function ConsoleDetection() {
     setSelectedCaptureCard,
     setSelectedMonitor,
   } = useAppStore();
-  const { getPeripherals, getCaptureCapabilities } = useElectronAPI();
+  const { getPeripherals, getCaptureCapabilities } = useAppAPI();
   const [readingCaps, setReadingCaps] = React.useState(false);
 
   const handleReadCaps = async () => {

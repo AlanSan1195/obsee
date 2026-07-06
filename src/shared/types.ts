@@ -47,7 +47,7 @@ export interface MicProfileRequest {
   deviceName: string;
   inputKind?: string;
   mode: OBSMode;
-  // Lo inyecta el proceso main (process.platform); opcional desde el renderer.
+  // Lo inyecta app-api (plataforma detectada del userAgent); opcional desde los componentes.
   os?: string;
 }
 
@@ -248,7 +248,7 @@ export interface AIRecommendation {
 
 export type ConsoleModel = 'ps5' | 'ps5_pro' | 'xbox_series_x' | 'xbox_series_s' | 'switch' | 'switch2';
 
-// Periféricos detectados localmente con systeminformation (solo lectura).
+// Periféricos detectados en el navegador con mediaDevices (solo lectura).
 export interface DetectedDisplay {
   model: string;
   main: boolean;

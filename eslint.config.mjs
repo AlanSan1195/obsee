@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'release/**', 'node_modules/**', 'src/dist/**', 'src/**/*.d.ts', 'src/**/*.js', 'src/**/*.js.map'],
+    ignores: ['dist/**', 'node_modules/**', 'src/**/*.d.ts'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -12,7 +12,6 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         console: 'readonly',
-        process: 'readonly',
         window: 'readonly',
         document: 'readonly',
       },

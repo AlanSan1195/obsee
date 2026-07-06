@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useAppAPI } from '../hooks/useAppAPI';
 
 type SourcePreviewProps = {
   sourceName: string;
@@ -10,11 +10,11 @@ type SourcePreviewProps = {
 // el usuario confirme "asi se ve" sin abrir OBS. Si OBS no puede capturar (kind
 // sin soporte, permisos), se oculta de forma silenciosa.
 export function SourcePreview({ sourceName, intervalMs = 1200 }: SourcePreviewProps) {
-  const { getSourceScreenshot } = useElectronAPI();
+  const { getSourceScreenshot } = useAppAPI();
   const [imageData, setImageData] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
-  // useElectronAPI devuelve funciones nuevas en cada render, asi que la guardamos
+  // useAppAPI devuelve funciones nuevas en cada render, asi que la guardamos
   // en un ref para que el efecto de polling solo dependa de sourceName (si no, el
   // efecto se reiniciaria en cada render y el preview parpadearia sin mostrarse).
   const screenshotRef = useRef(getSourceScreenshot);

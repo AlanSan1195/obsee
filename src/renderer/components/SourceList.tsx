@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useAppAPI } from '../hooks/useAppAPI';
 import type { SceneItemSummary, SourceKindFriendly } from '../../shared/types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { IconClapperboard, IconMonitor, IconTv, IconVideo, IconX } from './ui';
@@ -28,7 +28,7 @@ type SourceListProps = {
 
 export function SourceList({ sceneName, onAddSource }: SourceListProps) {
   const sceneSources = useAppStore((state) => state.sceneSources);
-  const { removeSource, setSourceEnabled } = useElectronAPI();
+  const { removeSource, setSourceEnabled } = useAppAPI();
   const [pendingDelete, setPendingDelete] = useState<SceneItemSummary | null>(null);
 
   if (!sceneName) {

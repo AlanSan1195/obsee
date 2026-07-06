@@ -2,22 +2,21 @@
 
 ## Project Structure & Module Organization
 
-OBSREC is an Electron desktop app for OBS configuration guidance. Main-process code lives in `src/main/`, including OBS WebSocket integration, backups, preload APIs, and AI service code under `src/main/ai/`. The React/Vite renderer lives in `src/renderer/`, with UI components in `src/renderer/components/`, hooks in `src/renderer/hooks/`, and Tailwind styles in `src/renderer/styles/`. Shared types, validation, and local recommendation logic live in `src/shared/`. Tests are colocated as `*.test.ts` or `*.test.tsx`. Planning notes are kept in `plans/`; production outputs go to `dist/` and `release/`.
+OBSREC (package `obsee`) is a web app for OBS configuration guidance, deployed on Vercel. The React/Vite frontend lives in `src/renderer/`, with UI components in `src/renderer/components/`, hooks in `src/renderer/hooks/`, browser-side services (OBS WebSocket manager, hardware detection, localStorage stores, AI client) in `src/renderer/lib/`, and Tailwind styles in `src/renderer/styles/`. Shared types, validation, and local recommendation logic live in `src/shared/`. Serverless API functions (Groq-backed AI, Tavily web search, rate limiting) live in `api/`. Tests are colocated as `*.test.ts` or `*.test.tsx`. Production build output goes to `dist/`.
 
 ## Build, Test, and Development Commands
 
 - `pnpm install`: install dependencies from `pnpm-lock.yaml`.
-- `pnpm run dev`: start Vite and launch Electron in development mode.
-- `pnpm run build:main`: compile Electron main-process TypeScript.
-- `pnpm run build:renderer`: build the renderer with Vite.
-- `pnpm run build`: compile both targets and package with `electron-builder`.
+- `pnpm run dev`: start the Vite dev server (proxies `/api` to production Vercel).
+- `pnpm run build`: build the web app with Vite into `dist/`.
 - `pnpm run lint`: run ESLint over `src/`.
-- `pnpm run typecheck`: run TypeScript checks for main and renderer configs.
+- `pnpm run typecheck`: run TypeScript checks for the frontend.
+- `pnpm run typecheck:api`: run TypeScript checks for the serverless functions.
 - `pnpm test`: run the Vitest suite once.
 
 ## Coding Style & Naming Conventions
 
-Use TypeScript throughout. Follow the existing style: two-space indentation, single quotes, semicolons, and named exports for reusable helpers. React components use `PascalCase` file and symbol names, such as `OBSComparison.tsx`; hooks use `useSomething.ts`; utility modules use lower camel case, such as `localRecommendation.ts`. Keep IPC-facing data validated in `src/shared/validation.ts` before crossing Electron boundaries. ESLint is configured in `eslint.config.mjs`; unused variables are errors unless argument names start with `_`.
+Use TypeScript throughout. Follow the existing style: two-space indentation, single quotes, semicolons, and named exports for reusable helpers. React components use `PascalCase` file and symbol names, such as `OBSComparison.tsx`; hooks use `useSomething.ts`; utility modules use lower camel case, such as `localRecommendation.ts`. Validate data crossing to OBS or the API with `src/shared/validation.ts` (it also produces the Spanish UX error messages). ESLint is configured in `eslint.config.mjs`; unused variables are errors unless argument names start with `_`.
 
 ## Testing Guidelines
 
@@ -29,4 +28,4 @@ Recent history uses short, direct commit messages, often Spanish and occasionall
 
 ## Security & Configuration Tips
 
-Do not commit `.env` or secrets. The desktop app should use `OBSREC_AI_API_URL`; keep `GROQ_API_KEY` and rate-limit secrets only in the Vercel backend environment. Treat OBS mutations carefully: validate inputs, preserve backup behavior, and document risky changes in the PR.
+Do not commit `.env` or secrets. Keep `GROQ_API_KEY`, `TAVILY_API_KEY`, and rate-limit secrets only in the Vercel backend environment — never in frontend code (`VITE_*` vars are public). The app talks to OBS over `ws://localhost:4455`; browsers only allow this from Chrome/Edge/Firefox (Safari blocks it). Treat OBS mutations carefully: validate inputs, preserve backup behavior (localStorage `obsrec-backup`), and document risky changes in the PR.

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../store';
-import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useAppAPI } from '../hooks/useAppAPI';
 import { extractObsBaseline } from '../../shared/obsUsage';
 import { IconSparkles, Spinner } from './ui';
 
@@ -20,7 +20,7 @@ export function AnalyzeButton() {
     captureCapabilities,
     isAnalyzingConsole,
   } = useAppStore();
-  const { getSystemInfo, getAIRecommendation, profileConsole } = useElectronAPI();
+  const { getSystemInfo, getAIRecommendation, profileConsole } = useAppAPI();
 
   const isConsole = analysisTarget === 'console';
   const busy = isAnalyzing || isAnalyzingConsole;

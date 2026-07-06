@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
-import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useAppAPI } from '../hooks/useAppAPI';
 import { IconClapperboard, IconRefresh, Section } from './ui';
 import { SceneList } from './SceneList';
 import { SourceList } from './SourceList';
@@ -13,7 +13,7 @@ export function ScenesPanel() {
   const obsConnected = useAppStore((state) => state.obsConnected);
   const scenes = useAppStore((state) => state.scenes);
   const selectedSceneName = useAppStore((state) => state.selectedSceneName);
-  const { refreshScenes, loadSourceKinds, loadSceneSources } = useElectronAPI();
+  const { refreshScenes, loadSourceKinds, loadSceneSources } = useAppAPI();
 
   const [autoLoaded, setAutoLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);

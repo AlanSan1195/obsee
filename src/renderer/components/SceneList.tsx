@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useAppAPI } from '../hooks/useAppAPI';
 import { ConfirmDialog } from './ConfirmDialog';
 import { IconX } from './ui';
 
@@ -11,7 +11,7 @@ export function SceneList() {
   const scenes = useAppStore((state) => state.scenes);
   const currentSceneName = useAppStore((state) => state.currentSceneName);
   const selectedSceneName = useAppStore((state) => state.selectedSceneName);
-  const { createScene, selectScene, removeScene } = useElectronAPI();
+  const { createScene, selectScene, removeScene } = useAppAPI();
 
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);

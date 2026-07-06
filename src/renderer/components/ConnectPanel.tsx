@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useAppAPI } from '../hooks/useAppAPI';
 import { IconPlug, Section } from './ui';
 
 export function ConnectPanel() {
@@ -12,7 +12,7 @@ export function ConnectPanel() {
     setObsConnectionSettings,
     setError,
   } = useAppStore();
-  const { connectToOBS } = useElectronAPI();
+  const { connectToOBS } = useAppAPI();
 
   if (obsConnected) return null;
 

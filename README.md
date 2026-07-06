@@ -1,6 +1,6 @@
 # OBSREC
 
-OBSREC es una aplicacion de escritorio para OBS que analiza tu computadora, recomienda ajustes de streaming/grabacion y compara esas recomendaciones contra la configuracion actual de OBS.
+OBSREC es una aplicacion web para OBS que analiza tu computadora, recomienda ajustes de streaming/grabacion y compara esas recomendaciones contra la configuracion actual de OBS. Corre en el navegador (Chrome, Edge o Firefox) y se conecta a OBS en tu misma computadora via WebSocket.
 
 La idea no es reemplazar OBS. La idea es hacer que OBS sea mas facil de entender.
 
@@ -21,15 +21,14 @@ En resumen: OBSREC busca ser una capa de diagnostico y acompanamiento para OBS, 
 
 ## Que Hace Hoy
 
-- Aplicacion de escritorio con Electron.
-- Interfaz en React + Vite.
-- Conexion con OBS mediante WebSocket.
+- Aplicacion web (React + Vite) desplegada en Vercel.
+- Conexion con OBS mediante WebSocket desde el navegador.
 - Configuracion editable de host, puerto y password de OBS WebSocket.
-- Analisis local del sistema:
-  - CPU
-  - GPU
-  - RAM
-  - sistema operativo
+- Deteccion de hardware desde el navegador:
+  - GPU (automatica via WebGL)
+  - hilos de CPU (automatico)
+  - modelo de CPU y RAM (formulario, persistido en el navegador)
+  - capturadoras HDMI (via permisos de camara)
 - Recomendaciones de OBS usando IA integrada via backend serverless.
 - Recomendacion local de respaldo si la IA falla.
 - Edicion manual antes de importar:
@@ -43,7 +42,7 @@ En resumen: OBSREC busca ser una capa de diagnostico y acompanamiento para OBS, 
 - Importacion de ajustes a OBS.
 - Comparacion entre ajustes actuales de OBS y ajustes recomendados.
 - Primera etapa de configuracion de audio documentada en [README_AUDIO.md](README_AUDIO.md).
-- Validacion de datos entre renderer y proceso main de Electron.
+- Validacion de datos antes de tocar OBS o llamar a la API.
 - Scripts de lint y typecheck.
 
 ## Diferencia Frente al Asistente Nativo de OBS
@@ -75,23 +74,26 @@ La meta a largo plazo es que OBSREC ayude a responder preguntas como:
 
 ## Stack Tecnico
 
-- Electron
 - React
 - Vite
 - TypeScript
 - Tailwind CSS
 - Zustand
 - OBS WebSocket
-- Groq SDK en backend
-- systeminformation
+- Funciones serverless en Vercel (Groq SDK, Tavily)
 
 ## Requisitos
 
+Para usar la app:
+
+- OBS Studio abierto en la misma computadora
+- OBS WebSocket habilitado
+- Chrome, Edge o Firefox (Safari no permite conectarse a OBS)
+
+Para desarrollo:
+
 - Node.js
 - pnpm
-- OBS Studio
-- OBS WebSocket habilitado
-- Backend de IA de OBSREC configurado para recomendaciones integradas
 
 OBS WebSocket viene integrado en versiones modernas de OBS. En OBS puedes abrir:
 
@@ -105,23 +107,15 @@ Valores locales recomendados:
 
 ## Variables de Entorno
 
-Copia `.env.example` a `.env` y completa tus valores.
+El frontend no necesita variables: en produccion llama a la API en el mismo origen, y en desarrollo el proxy de Vite redirige `/api` a produccion. Opcionalmente, `VITE_AI_API_URL` apunta la API a otra base (por ejemplo `vercel dev` local).
 
-```bash
-OBSREC_AI_API_URL=http://localhost:3000
-OBS_WEBSOCKET_HOST=localhost
-OBS_WEBSOCKET_PORT=4455
-OBS_WEBSOCKET_PASSWORD=
-```
-
-Los valores de conexion de OBS tambien pueden capturarse directamente desde la app.
-
-Las claves del proveedor de IA no deben incluirse en el build de Electron. Para produccion, configura estas variables solo en el backend de Vercel:
+Las claves del proveedor de IA nunca van en el frontend. Configura estas variables solo en el backend de Vercel:
 
 ```bash
 GROQ_API_KEY=
 GROQ_MODEL=openai/gpt-oss-120b
 OBSREC_AI_DAILY_LIMIT=20
+TAVILY_API_KEY=
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
 ```
@@ -136,22 +130,10 @@ Instalar dependencias:
 pnpm install
 ```
 
-Ejecutar la app:
+Ejecutar la app (abre `http://localhost:5173`):
 
 ```bash
 pnpm run dev
-```
-
-Compilar el proceso main:
-
-```bash
-pnpm run build:main
-```
-
-Compilar el renderer:
-
-```bash
-pnpm run build:renderer
 ```
 
 Ejecutar verificaciones:
@@ -185,8 +167,8 @@ OBSREC_AI_API_URL=https://obsrec.vercel.app pnpm run test:ai-backend -- --ai
 
 ```text
 src/
-  main/        Proceso main de Electron, IPC e integracion con OBS
   renderer/    Interfaz React
+    lib/       Integracion con OBS WebSocket, deteccion de hardware, cliente de IA
   shared/      Tipos compartidos, validadores y logica de recomendacion
 api/           Endpoints serverless de IA integrada para Vercel
 ```
@@ -198,7 +180,7 @@ api/           Endpoints serverless de IA integrada para Vercel
 3. Configura en Vercel: `GROQ_API_KEY`, `GROQ_MODEL`, `OBSREC_AI_DAILY_LIMIT`, `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`.
 4. Despliega y prueba `GET /api/health`.
 5. Ejecuta `pnpm run test:ai-backend -- --ai` apuntando `OBSREC_AI_API_URL` a la URL desplegada.
-6. Usa esa misma URL como `OBSREC_AI_API_URL` en la app de escritorio.
+6. La app web desplegada en ese mismo proyecto usa la API automaticamente (mismo origen).
 
 ## Estado Actual
 
@@ -229,7 +211,7 @@ OBSREC modifica ajustes de OBS mediante WebSocket. Antes de usarlo para una tran
 
 Cuando sea posible, es recomendable grabar en MKV para reducir el riesgo de perder una grabacion si OBS o el sistema fallan.
 
-La app de escritorio no debe contener `GROQ_API_KEY`. El backend recibe informacion tecnica del equipo, modo y plataforma para generar recomendaciones; no necesita archivos locales ni claves de OBS.
+El frontend no debe contener `GROQ_API_KEY` ni `TAVILY_API_KEY`. El backend recibe informacion tecnica del equipo, modo y plataforma para generar recomendaciones; no necesita archivos locales ni claves de OBS.
 
 ## Repositorio
 

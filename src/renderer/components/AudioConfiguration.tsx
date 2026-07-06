@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '../store';
-import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useAppAPI } from '../hooks/useAppAPI';
 import type { MicProfileResponse, OBSAudioConfig, OBSAudioDevice, OBSAudioFilterConfig } from '../../shared/types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { IconAlert, IconCheck, IconMic, IconRefresh, IconSparkles, IconX, Section, Spinner } from './ui';
@@ -113,14 +113,13 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
     setObsMessage,
     setMicProfile,
   } = useAppStore();
-  const { refreshAudioSnapshot, applyAudioConfig, profileMicrophone } = useElectronAPI();
+  const { refreshAudioSnapshot, applyAudioConfig, profileMicrophone } = useAppAPI();
   const [useAiRecommendation, setUseAiRecommendation] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
-  const [localDeviceStatus, setLocalDeviceStatus] = useState('Permiso de microfono local no solicitado');
+  const localDeviceStatus = 'Permiso de microfono local no solicitado';
   const [detectionMessage, setDetectionMessage] = useState('');
   const [autoDetectTried, setAutoDetectTried] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false);
   const [previewConfirmOpen, setPreviewConfirmOpen] = useState(false);
   const [noiseSuppression, setNoiseSuppression] = useState(true);
   const [monitorType, setMonitorType] = useState<OBSAudioConfig['monitorType']>('OBS_MONITORING_TYPE_NONE');
@@ -241,7 +240,6 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
     const result = await applyAudioConfig(config);
     if (result.success) {
       setObsMessage(result.message);
-      setPreviewMode(true);
       setPreviewConfirmOpen(true);
     } else {
       setError(result.message);
@@ -256,7 +254,6 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
     const result = await applyAudioConfig(config);
     if (result.success) {
       setObsMessage(result.message);
-      setPreviewMode(false);
       setPreviewConfirmOpen(false);
       onApplySuccess?.();
     } else {
@@ -266,7 +263,6 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
 
   const handleConfirmPreview = () => {
     setPreviewConfirmOpen(false);
-    setPreviewMode(false);
     onApplySuccess?.();
   };
 
@@ -301,7 +297,6 @@ export function AudioConfiguration({ onApplySuccess }: AudioConfigurationProps =
     );
   }
 
-  const filtersReady = obsAudioSnapshot.obsrecFiltersConfigured;
   const monoSupported = obsAudioSnapshot.monoSupported;
   const fps = obsSettingsSnapshot?.fps ?? 60;
   const syncFrames = [1, 2, 3, 4, 5, 6];

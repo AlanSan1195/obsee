@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useAppAPI } from '../hooks/useAppAPI';
 import type { DeviceOption, ResolvedSourceKind, SourceKindFriendly } from '../../shared/types';
 import { IconClapperboard, IconMonitor, IconTv, IconVideo, Spinner } from './ui';
 import { SourcePreview } from './SourcePreview';
@@ -44,7 +44,7 @@ export function AddSourceWizard({ sceneName, onClose, onCreated }: AddSourceWiza
     refreshScenes,
     createGuidedSource,
     renameSource,
-  } = useElectronAPI();
+  } = useAppAPI();
 
   const [step, setStep] = useState<WizardStep>('choose-what');
   const [busy, setBusy] = useState(false);

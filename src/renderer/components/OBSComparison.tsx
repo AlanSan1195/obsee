@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../store';
-import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useAppAPI } from '../hooks/useAppAPI';
 import { ConfirmDialog } from './ConfirmDialog';
 import { IconActivity, IconCheck, IconRefresh, Section } from './ui';
 import type { AIRecommendation, OBSSettingsSnapshot } from '../../shared/types';
@@ -106,7 +106,7 @@ export function buildComparisonRows(
 
 export function OBSComparison() {
   const { obsSettingsSnapshot, recommendation, obsConnected, setError } = useAppStore();
-  const { getLastBackup, restoreLastBackup } = useElectronAPI();
+  const { getLastBackup, restoreLastBackup } = useAppAPI();
   const [restoreDialogOpen, setRestoreDialogOpen] = React.useState(false);
   const [backupDate, setBackupDate] = React.useState<string | null>(null);
 

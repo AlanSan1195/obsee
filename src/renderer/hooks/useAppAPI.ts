@@ -3,11 +3,7 @@ import { inferObsUsage } from '../../shared/obsUsage';
 import { appAPI } from '../lib/app-api';
 import type { AIRecommendationExplanationRequest, AIRecommendationRequest, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, BeginGuidedSourceResult, CameraLayout, CaptureCapabilities, ConsoleProfileRequest, ConsoleProfileResponse, CreateGuidedSourceConfig, MicProfileRequest, MicProfileResponse, OBSAudioConfig, OBSConfig, OBSConnectionSettings, PeripheralsSnapshot } from '../../shared/types';
 
-function getElectronAPI() {
-  return appAPI;
-}
-
-export function useElectronAPI() {
+export function useAppAPI() {
   const setSystemInfo = useAppStore((state) => state.setSystemInfo);
   const setRecommendation = useAppStore((state) => state.setRecommendation);
   const setObsConnected = useAppStore((state) => state.setObsConnected);
@@ -30,7 +26,7 @@ export function useElectronAPI() {
 
   const getSystemInfo = async () => {
     try {
-      const info = await getElectronAPI().system.getInfo();
+      const info = await appAPI.system.getInfo();
       setSystemInfo(info);
       return info;
     } catch (error) {
@@ -41,7 +37,7 @@ export function useElectronAPI() {
 
   const getAIRecommendation = async (request: AIRecommendationRequest) => {
     try {
-      const recommendation = await getElectronAPI().ai.getRecommendation(request);
+      const recommendation = await appAPI.ai.getRecommendation(request);
       setRecommendation(recommendation);
       return recommendation;
     } catch (error) {
@@ -52,7 +48,7 @@ export function useElectronAPI() {
 
   const explainAIRecommendation = async (request: AIRecommendationExplanationRequest) => {
     try {
-      return await getElectronAPI().ai.explainRecommendation(request);
+      return await appAPI.ai.explainRecommendation(request);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'No se pudo actualizar la explicacion de IA');
       throw error;
@@ -63,7 +59,7 @@ export function useElectronAPI() {
     setIsProfilingMic(true);
     setError(null);
     try {
-      const profile = await getElectronAPI().ai.profileMicrophone(request);
+      const profile = await appAPI.ai.profileMicrophone(request);
       setMicProfile(profile);
       return profile;
     } catch (error) {
@@ -76,7 +72,7 @@ export function useElectronAPI() {
 
   const getCaptureCapabilities = async (deviceName?: string): Promise<CaptureCapabilities | null> => {
     try {
-      const result = await getElectronAPI().obs.getCaptureCapabilities({ deviceName });
+      const result = await appAPI.obs.getCaptureCapabilities({ deviceName });
       if (result.success && result.capabilities) {
         setCaptureCapabilities(result.capabilities);
         return result.capabilities;
@@ -91,7 +87,7 @@ export function useElectronAPI() {
 
   const getPeripherals = async (): Promise<PeripheralsSnapshot | null> => {
     try {
-      const peripherals = await getElectronAPI().system.getPeripherals();
+      const peripherals = await appAPI.system.getPeripherals();
       if (import.meta.env.DEV) {
         console.log('[peripherals] Detectados:', {
           capturadoras: peripherals.captureDevices,
@@ -110,7 +106,7 @@ export function useElectronAPI() {
     setIsAnalyzingConsole(true);
     setError(null);
     try {
-      const profile = await getElectronAPI().ai.profileConsole(request);
+      const profile = await appAPI.ai.profileConsole(request);
       if (import.meta.env.DEV) {
         const navSources = profile.profile?.sources ?? [];
         console.log('[console-profile] Respuesta IA:', {
@@ -138,11 +134,11 @@ export function useElectronAPI() {
 
   const connectToOBS = async (settings: OBSConnectionSettings) => {
     try {
-      const result = await getElectronAPI().obs.connect(settings);
+      const result = await appAPI.obs.connect(settings);
       setObsConnected(result.success);
       setObsMessage(result.message);
       if (result.success) {
-        const snapshotResult = await getElectronAPI().obs.getSettingsSnapshot();
+        const snapshotResult = await appAPI.obs.getSettingsSnapshot();
         if (snapshotResult.success && snapshotResult.snapshot) {
           setObsSettingsSnapshot(snapshotResult.snapshot);
           setObsAudioSnapshot(snapshotResult.snapshot.audio ?? null);
@@ -174,7 +170,7 @@ export function useElectronAPI() {
   };
 
   const disconnectFromOBS = async () => {
-    const result = await getElectronAPI().obs.disconnect();
+    const result = await appAPI.obs.disconnect();
     setObsConnected(false);
     setObsSettingsSnapshot(null);
     setObsAudioSnapshot(null);
@@ -183,7 +179,7 @@ export function useElectronAPI() {
   };
 
   const refreshAudioSnapshot = async () => {
-    const result = await getElectronAPI().obs.getAudioSnapshot();
+    const result = await appAPI.obs.getAudioSnapshot();
     if (result.success && result.snapshot) {
       setObsAudioSnapshot(result.snapshot);
     }
@@ -193,7 +189,7 @@ export function useElectronAPI() {
   const applyAudioConfig = async (config: OBSAudioConfig) => {
     setIsApplying(true);
     try {
-      const result = await getElectronAPI().obs.configureAudio(config);
+      const result = await appAPI.obs.configureAudio(config);
       if (result.success && result.snapshot) {
         setObsAudioSnapshot(result.snapshot);
       }
@@ -206,9 +202,9 @@ export function useElectronAPI() {
   const applyConfig = async (config: OBSConfig) => {
     setIsApplying(true);
     try {
-      const result = await getElectronAPI().obs.configure(config);
+      const result = await appAPI.obs.configure(config);
       if (result.success) {
-        const snapshotResult = await getElectronAPI().obs.getSettingsSnapshot();
+        const snapshotResult = await appAPI.obs.getSettingsSnapshot();
         if (snapshotResult.success && snapshotResult.snapshot) {
           setObsSettingsSnapshot(snapshotResult.snapshot);
           setObsAudioSnapshot(snapshotResult.snapshot.audio ?? null);
@@ -221,7 +217,7 @@ export function useElectronAPI() {
   };
 
   const refreshScenes = async () => {
-    const result = await getElectronAPI().obs.getScenes();
+    const result = await appAPI.obs.getScenes();
     if (result.success && result.snapshot) {
       setScenes(result.snapshot.scenes);
       setCurrentSceneName(result.snapshot.currentProgramSceneName ?? null);
@@ -235,7 +231,7 @@ export function useElectronAPI() {
   };
 
   const loadSourceKinds = async () => {
-    const result = await getElectronAPI().obs.getSourceKinds();
+    const result = await appAPI.obs.getSourceKinds();
     if (result.success && result.resolved) {
       setAvailableSourceKinds(result.resolved);
     }
@@ -243,7 +239,7 @@ export function useElectronAPI() {
   };
 
   const createScene = async (name: string) => {
-    const result = await getElectronAPI().obs.createScene(name);
+    const result = await appAPI.obs.createScene(name);
     if (result.success && result.snapshot) {
       setScenes(result.snapshot.scenes);
       setCurrentSceneName(result.snapshot.currentProgramSceneName ?? null);
@@ -257,7 +253,7 @@ export function useElectronAPI() {
 
   const selectScene = async (name: string) => {
     setSelectedSceneName(name);
-    const result = await getElectronAPI().obs.setCurrentScene(name);
+    const result = await appAPI.obs.setCurrentScene(name);
     if (result.success) {
       setCurrentSceneName(name);
     } else {
@@ -268,7 +264,7 @@ export function useElectronAPI() {
   };
 
   const removeScene = async (name: string) => {
-    const result = await getElectronAPI().obs.removeScene(name);
+    const result = await appAPI.obs.removeScene(name);
     if (result.success && result.snapshot) {
       setScenes(result.snapshot.scenes);
       setCurrentSceneName(result.snapshot.currentProgramSceneName ?? null);
@@ -286,7 +282,7 @@ export function useElectronAPI() {
   };
 
   const loadSceneSources = async (name: string) => {
-    const result = await getElectronAPI().obs.getSceneSources(name);
+    const result = await appAPI.obs.getSceneSources(name);
     if (result.success && result.snapshot) {
       setSceneSources(result.snapshot.items);
     }
@@ -294,7 +290,7 @@ export function useElectronAPI() {
   };
 
   const beginGuidedSource = async (arg: BeginGuidedSourceInput): Promise<BeginGuidedSourceResult> => {
-    const result = await getElectronAPI().obs.beginGuidedSource(arg);
+    const result = await appAPI.obs.beginGuidedSource(arg);
     if (!result.success) {
       setError(result.message);
     }
@@ -302,7 +298,7 @@ export function useElectronAPI() {
   };
 
   const applyGuidedSourceDevice = async (arg: ApplyGuidedSourceDeviceInput) => {
-    const result = await getElectronAPI().obs.applyGuidedSourceDevice(arg);
+    const result = await appAPI.obs.applyGuidedSourceDevice(arg);
     if (!result.success) {
       setError(result.message);
     }
@@ -310,11 +306,11 @@ export function useElectronAPI() {
   };
 
   const cancelGuidedSource = async (inputName: string) => {
-    return getElectronAPI().obs.cancelGuidedSource(inputName);
+    return appAPI.obs.cancelGuidedSource(inputName);
   };
 
   const setCameraLayout = async (sceneName: string, sceneItemId: number, layout: CameraLayout) => {
-    const result = await getElectronAPI().obs.setCameraLayout({ sceneName, sceneItemId, layout });
+    const result = await appAPI.obs.setCameraLayout({ sceneName, sceneItemId, layout });
     if (!result.success) {
       setError(result.message);
     }
@@ -322,11 +318,11 @@ export function useElectronAPI() {
   };
 
   const setSourceToBottom = async (sceneName: string, sceneItemId: number) => {
-    return getElectronAPI().obs.setSourceToBottom({ sceneName, sceneItemId });
+    return appAPI.obs.setSourceToBottom({ sceneName, sceneItemId });
   };
 
   const createCameraScene = async (sceneName: string, inputName: string, deviceId: string, propertyName: string) => {
-    const result = await getElectronAPI().obs.createCameraScene({ sceneName, inputName, deviceId, propertyName });
+    const result = await appAPI.obs.createCameraScene({ sceneName, inputName, deviceId, propertyName });
     if (!result.success) {
       setError(result.message);
     }
@@ -334,7 +330,7 @@ export function useElectronAPI() {
   };
 
   const createGuidedSource = async (config: CreateGuidedSourceConfig) => {
-    const result = await getElectronAPI().obs.createGuidedSource(config);
+    const result = await appAPI.obs.createGuidedSource(config);
     if (!result.success) {
       setError(result.message);
     }
@@ -342,7 +338,7 @@ export function useElectronAPI() {
   };
 
   const removeSource = async (name: string, sceneName: string) => {
-    const result = await getElectronAPI().obs.removeSource(name);
+    const result = await appAPI.obs.removeSource(name);
     if (result.success) {
       await loadSceneSources(sceneName);
     } else {
@@ -352,7 +348,7 @@ export function useElectronAPI() {
   };
 
   const renameSource = async (inputName: string, newInputName: string) => {
-    const result = await getElectronAPI().obs.renameSource({ inputName, newInputName });
+    const result = await appAPI.obs.renameSource({ inputName, newInputName });
     if (!result.success) {
       setError(result.message);
     }
@@ -360,7 +356,7 @@ export function useElectronAPI() {
   };
 
   const setSourceEnabled = async (sceneName: string, sceneItemId: number, enabled: boolean) => {
-    const result = await getElectronAPI().obs.setSourceEnabled({ sceneName, sceneItemId, enabled });
+    const result = await appAPI.obs.setSourceEnabled({ sceneName, sceneItemId, enabled });
     if (result.success) {
       await loadSceneSources(sceneName);
     } else {
@@ -370,17 +366,17 @@ export function useElectronAPI() {
   };
 
   const getSourceScreenshot = async (sourceName: string, maxWidth?: number) => {
-    return getElectronAPI().obs.sourceScreenshot({ sourceName, maxWidth });
+    return appAPI.obs.sourceScreenshot({ sourceName, maxWidth });
   };
 
   const getLastBackup = async () => {
-    return getElectronAPI().obs.getLastBackup();
+    return appAPI.obs.getLastBackup();
   };
 
   const restoreLastBackup = async () => {
-    const result = await getElectronAPI().obs.restoreLastBackup();
+    const result = await appAPI.obs.restoreLastBackup();
     if (result.success) {
-      const snapshotResult = await getElectronAPI().obs.getSettingsSnapshot();
+      const snapshotResult = await appAPI.obs.getSettingsSnapshot();
       if (snapshotResult.success && snapshotResult.snapshot) {
         setObsSettingsSnapshot(snapshotResult.snapshot);
         setObsAudioSnapshot(snapshotResult.snapshot.audio ?? null);

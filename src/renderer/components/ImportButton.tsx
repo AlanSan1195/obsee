@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { useElectronAPI } from '../hooks/useElectronAPI';
+import { useAppAPI } from '../hooks/useAppAPI';
 import { createDefaultAudioConfig } from './AudioConfiguration';
 import { buildComparisonRows, isSameValue } from './OBSComparison';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -19,7 +19,7 @@ export function ImportButton() {
     setError,
     isApplying,
   } = useAppStore();
-  const { applyConfig } = useElectronAPI();
+  const { applyConfig } = useAppAPI();
 
   const canImport = mode && platform && recommendation && obsConnected;
   const changedRows = recommendation && obsSettingsSnapshot

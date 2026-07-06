@@ -206,11 +206,7 @@ export default function App() {
 
             <ConnectPanel />
 
-            {obsConnected && (
-              <p className="w-full max-w-md text-center text-sm text-text-muted">
-                OBS conectado <span className="text-secondary">✓</span> — continua con los ajustes de tu stream.
-              </p>
-            )}
+           
 
             {/* aviso beta, sin ensuciar el hero */}
             <div className="flex w-full max-w-md items-center gap-2 border border-warning/35 bg-warning/[0.06] px-4 py-3 text-left text-xs leading-relaxed text-text-muted">
@@ -280,15 +276,20 @@ export default function App() {
           </div>
         )}
       </main>
+      
 
       {obsConnected && activeTab === 0 && (
-        <div className="flex justify-end pt-6">
+        <div className="mt-8 flex flex-col items-center gap-4  pt-5 sm:flex-row sm:mx-20 sm:justify-between">
+          <p className="text-center text-sm text-text-muted sm:text-left">
+            OBS conectado <span className="text-secondary">✓</span> — continua con los ajustes de tu stream.
+          </p>
           <button
             type="button"
             onClick={() => setActiveTab(1)}
-            className="flex items-center gap-2 rounded-none bg-primary px-6 py-3 text-sm font-bold lowercase tracking-terminal text-background glow-primary transition-all hover:bg-primary-hover active:scale-[0.99]"
+            className="group flex w-full shrink-0 items-center justify-center gap-2 rounded-none bg-primary px-6 py-3 text-sm font-bold lowercase tracking-terminal text-background glow-primary transition-all hover:bg-primary-hover active:scale-[0.99] sm:w-auto"
           >
-            siguiente →
+            siguiente
+            <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">→</span>
           </button>
         </div>
       )}

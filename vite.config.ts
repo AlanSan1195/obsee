@@ -9,6 +9,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // Sin inline de assets: las fuentes Doto (~4KB) se incrustaban como data:
+    // URIs y el CSP (font-src ausente -> default-src 'self') las bloqueaba.
+    assetsInlineLimit: 0,
   },
   resolve: {
     alias: {

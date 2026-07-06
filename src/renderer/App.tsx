@@ -177,9 +177,7 @@ export default function App() {
       <main className="flex-1">
         {activeTab === 0 && (
           <div className="flex flex-col items-center justify-center gap-6 py-12">
-            <span className="text-[0.7rem] lowercase tracking-terminal text-text-faint">
-              <span className="text-primary">$</span> obsee --init<span className="blink-cursor ml-1" />
-            </span>
+            
             <h1 className="flex items-center font-display text-6xl font-black leading-none tracking-[0.02em] text-text sm:text-7xl">
               <span className="text-primary text-glow">obs</span>ee
               <svg
@@ -206,8 +204,8 @@ export default function App() {
                 <path d="M10 21v-2" />
               </svg>
             </h1>
-            <p className="max-w-md text-center text-sm leading-relaxed text-text-muted">
-              Analiza tu equipo, detecta tu hardware y obtén la mejor configuración para un stream o directo de calidad <span className="text-text">antes</span> de aplicarlo.
+            <p className="max-w-md text-center text-sm leading-relaxed text-text-muted">No te preocupes si no sabes configurar  <span className="text-text">OBS</span>, obsee 
+              analiza tu equipo, detecta tu hardware y hace el mejor match de configuracion para tu OBS.
             </p>
 
             {/* aviso beta, sin ensuciar el hero */}

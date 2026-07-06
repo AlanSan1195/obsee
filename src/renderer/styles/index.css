@@ -61,9 +61,9 @@
 
 :root {
   /* ponytail: single color knob — retune the whole app from these RGB triplets */
-  --accent-rgb: 59 111 224;        /* #3b6fe0  azul profundo pro */
-  --accent-hover-rgb: 92 140 245;  /* #5c8cf5 */
-  --accent-dim-rgb: 42 79 184;     /* #2a4fb8 */
+  --accent-rgb: 58 155 220;        /* #3a9bdc */
+  --accent-hover-rgb: 91 178 235;  /* #5bb2eb */
+  --accent-dim-rgb: 38 125 183;    /* #267db7 */
   --accent: rgb(var(--accent-rgb));
   --accent-dim: rgb(var(--accent-dim-rgb));
 }
@@ -193,14 +193,14 @@ input[type='checkbox'] {
     appearance: none;
     cursor: pointer;
     padding-right: 1.75rem;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b6fe0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a9bdc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.4rem center;
     background-size: 1rem;
   }
 }
 
-/* blue text glow helper */
+/* primary text glow helper */
 .text-glow {
   text-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.45);
 }

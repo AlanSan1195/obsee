@@ -15,7 +15,7 @@ module.exports = {
         surface: 'rgba(255,255,255,0.015)',
         'surface-hover': 'rgb(var(--accent-rgb) / 0.06)',
         border: 'rgb(var(--accent-rgb) / 0.14)',
-        // deep "pro" blue accent — single source: --accent-rgb in index.css
+        // primary accent — single source: --accent-rgb in index.css
         primary: 'rgb(var(--accent-rgb) / <alpha-value>)',
         'primary-dim': 'rgb(var(--accent-dim-rgb) / <alpha-value>)',
         'primary-hover': 'rgb(var(--accent-hover-rgb) / <alpha-value>)',

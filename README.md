@@ -13,27 +13,11 @@ OBS ya trae un asistente de auto-configuración, pero funciona como caja negra: 
 - Te deja **editar** la recomendación, y la IA re-explica el impacto de tus cambios.
 - Guarda un **respaldo** de tu configuración anterior para restaurarla cuando quieras.
 
-## Cómo funciona
+## Setup
 
-```text
-navegador ──ws://localhost:4455──> OBS Studio        (control directo, nunca sale de tu PC)
-navegador ──HTTPS──> funciones serverless en Vercel  (IA: Groq + búsqueda web Tavily)
-```
+**Como usuario**: OBS Studio abierto en la misma computadora con el servidor WebSocket activado (`Herramientas → Ajustes del servidor WebSocket`) y un navegador Chrome, Edge o Firefox (Safari bloquea la conexión local con OBS).
 
-Detalles importantes de su funcionamiento:
-
-- **La conexión con OBS es 100% local.** El navegador habla con el servidor WebSocket de OBS en tu misma máquina. Tu password de OBS, tus escenas y tu configuración nunca pasan por internet; a la IA solo viajan specs anónimas de hardware (CPU, GPU, RAM, SO).
-- **Detección de hardware desde el navegador**: la GPU se detecta vía WebGL y las capturadoras HDMI vía permisos de cámara (`mediaDevices`). El modelo de CPU y la RAM se piden en un formulario (el navegador no puede leerlos) y quedan guardados en `localStorage`.
-- **Si la IA no está disponible** (sin red, límite diario), un motor de recomendación local genera la configuración como respaldo — la app nunca se queda sin respuesta.
-- **Antes de aplicar cualquier cambio**, obsee respalda la configuración actual de OBS en tu navegador (`localStorage`) y puedes restaurarla desde la pestaña de comparación.
-- **Flujo guiado en 4 pasos**: conectar → ajustes (hardware, modo, plataforma) → detección (recomendación + audio) → escenas (con vista previa en vivo de lo que verá tu stream).
-- También perfila **consolas** (PS5/Xbox/Switch): detecta tu capturadora, lee sus capacidades reales desde OBS y recomienda la cadena de captura completa.
-
-## Usarlo
-
-Requisitos: OBS Studio abierto en la misma computadora con el servidor WebSocket activado (`Herramientas → Ajustes del servidor WebSocket`) y un navegador Chrome, Edge o Firefox (Safari bloquea la conexión local con OBS).
-
-## Desarrollo
+**Como desarrollador**:
 
 ```bash
 pnpm install
@@ -41,6 +25,15 @@ pnpm dev          # abre http://localhost:5173 (proxy /api hacia producción)
 pnpm test         # suite de Vitest
 pnpm typecheck && pnpm lint
 pnpm build        # build de producción en dist/
+```
+
+Las claves (`GROQ_API_KEY`, `TAVILY_API_KEY`, rate limits) viven **solo** en las variables de entorno de Vercel — el frontend no contiene secretos.
+
+## Arquitectura y decisiones
+
+```text
+navegador ──ws://localhost:4455──> OBS Studio        (control directo, nunca sale de tu PC)
+navegador ──HTTPS──> funciones serverless en Vercel  (IA: Groq + búsqueda web Tavily)
 ```
 
 Stack: React 19 + Vite + TypeScript + Tailwind + Zustand; `obs-websocket-js` en el navegador; funciones serverless en Vercel (`api/`) con Groq y Tavily.
@@ -52,12 +45,23 @@ src/shared/         tipos, validadores y motor de recomendación local
 api/                endpoints serverless de IA (Vercel)
 ```
 
-Las claves (`GROQ_API_KEY`, `TAVILY_API_KEY`, rate limits) viven **solo** en las variables de entorno de Vercel — el frontend no contiene secretos.
+Decisiones vigentes:
 
-## Nota de seguridad
+- **La conexión con OBS es 100% local.** El navegador habla con el servidor WebSocket de OBS en tu misma máquina. Tu password de OBS, tus escenas y tu configuración nunca pasan por internet; a la IA solo viajan specs anónimas de hardware (CPU, GPU, RAM, SO).
+- **Detección de hardware híbrida**: GPU vía WebGL, capturadoras HDMI vía permisos de cámara; CPU y RAM se piden en un formulario (el navegador no puede leerlos con fiabilidad) y persisten en `localStorage`.
+- **Nunca sin respuesta**: si la IA no está disponible (sin red, límite diario), un motor de recomendación local genera la configuración.
+- **Respaldo antes de tocar**: la configuración actual de OBS se guarda en `localStorage` y se puede restaurar desde la pestaña de comparación.
+- **Flujo guiado en 4 pasos**: conectar → ajustes (hardware, modo, plataforma) → detección (recomendación + audio) → escenas (con vista previa en vivo).
+- **Perfilado de consolas** (PS5/Xbox/Switch): detecta tu capturadora, lee sus capacidades reales desde OBS y recomienda la cadena de captura completa.
 
-obsee modifica ajustes de OBS vía WebSocket. Está en **beta**: antes de un directo o grabación importante, revisa dentro de OBS los ajustes aplicados. Cuando sea posible, graba en MKV para no perder la grabación si OBS o el sistema fallan.
 
----
+- **CSP vs `assetsInlineLimit` de Vite**: Vite incrusta assets < 4 KB como `data:` URIs, y una CSP con `default-src 'self'` sin `font-src` los bloquea — solo en producción, porque el dev server no incrusta. Fix: `assetsInlineLimit: 0`. → [apuntes](docs/apuntes.md#csp--vite-assetsinlinelimit-por-qué-las-fuentes-se-veían-en-local-pero-no-en-producción)
+- **`ws://localhost` desde HTTPS**: localhost es un "origen potencialmente confiable", exento de la regla de mixed content (excepto en Safari); IPs de LAN sí se bloquean — por eso obsee solo controla el OBS local. → [apuntes](docs/apuntes.md#websocket-a-wslocalhost-desde-una-página-https)
+- **Detección de hardware en navegador**: la GPU llega envuelta en un string ANGLE que hay que parsear; `deviceMemory` satura en 8 GB por anti-fingerprinting; `enumerateDevices()` no da labels sin permiso de cámara previo. → [apuntes](docs/apuntes.md#detección-de-hardware-desde-el-navegador-qué-se-puede-y-qué-no)
+- **Patrón adapter en la migración**: `appAPI` conservó la forma exacta del viejo `window.electronAPI`, así que cambiar Electron por navegador tocó una sola costura, no toda la UI. → [apuntes](docs/apuntes.md#de-ipc-de-electron-a-un-módulo-del-navegador-la-costura-appapi)
+- **Proxy de Vite contra CORS**: en dev, `/api` se reenvía a producción para que el navegador vea same-origin y no dispare preflight por el header custom. → [apuntes](docs/apuntes.md#proxy-de-vite-en-dev-esquivar-cors-sin-tocar-el-backend)
+- **Regla `VITE_*`**: toda variable con ese prefijo se incrusta en el bundle público; los secretos viven solo en el serverless. → [apuntes](docs/apuntes.md#secretos-en-apps-frontend-la-regla-vite_)
+
+
 
 GitHub: <https://github.com/AlanSan1195/obsee>

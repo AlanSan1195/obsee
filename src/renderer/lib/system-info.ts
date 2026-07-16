@@ -1,10 +1,30 @@
 import type { SystemInfo } from '../../shared/types';
 
 const HARDWARE_KEY = 'obsrec-hardware';
+const HARDWARE_SCHEMA_VERSION = 2;
 
 export interface HardwareOverrides {
   cpuModel?: string;
+  cpuCores?: number;
   ramGb?: number;
+}
+
+interface StoredHardwareOverrides extends HardwareOverrides {
+  version: typeof HARDWARE_SCHEMA_VERSION;
+}
+
+function isValidCpuCoreCount(value: unknown): value is number {
+  return typeof value === 'number'
+    && Number.isInteger(value)
+    && value >= 1
+    && value <= 256;
+}
+
+function isValidRamGb(value: unknown): value is number {
+  return typeof value === 'number'
+    && Number.isFinite(value)
+    && value > 0
+    && value <= 2048;
 }
 
 export function loadHardwareOverrides(): HardwareOverrides {
@@ -13,11 +33,15 @@ export function loadHardwareOverrides(): HardwareOverrides {
     if (!raw) return {};
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== 'object' || parsed === null) return {};
+    const version = (parsed as { version?: unknown }).version;
     const cpuModel = (parsed as { cpuModel?: unknown }).cpuModel;
+    const cpuCores = (parsed as { cpuCores?: unknown }).cpuCores;
     const ramGb = (parsed as { ramGb?: unknown }).ramGb;
     return {
       cpuModel: typeof cpuModel === 'string' && cpuModel.trim().length > 0 ? cpuModel.trim() : undefined,
-      ramGb: typeof ramGb === 'number' && ramGb > 0 ? ramGb : undefined,
+      cpuCores: version === HARDWARE_SCHEMA_VERSION && isValidCpuCoreCount(cpuCores) ? cpuCores : undefined,
+      // La version anterior pudo guardar navigator.deviceMemory sin confirmacion.
+      ramGb: version === HARDWARE_SCHEMA_VERSION && isValidRamGb(ramGb) ? ramGb : undefined,
     };
   } catch {
     return {};
@@ -25,7 +49,15 @@ export function loadHardwareOverrides(): HardwareOverrides {
 }
 
 export function saveHardwareOverrides(overrides: HardwareOverrides): void {
-  localStorage.setItem(HARDWARE_KEY, JSON.stringify(overrides));
+  try {
+    const stored: StoredHardwareOverrides = {
+      version: HARDWARE_SCHEMA_VERSION,
+      ...overrides,
+    };
+    localStorage.setItem(HARDWARE_KEY, JSON.stringify(stored));
+  } catch {
+    // El almacenamiento puede estar deshabilitado o sin espacio; el formulario sigue funcionando.
+  }
 }
 
 export interface DetectedGpu {
@@ -95,7 +127,7 @@ export function getOsPlatform(): string {
 
 export interface HardwareHints {
   gpu: DetectedGpu;
-  cores: number;
+  logicalProcessors?: number;
   cpuModelHint?: string;
   ramGbHint?: number;
   os: SystemInfo['os'];
@@ -103,10 +135,13 @@ export interface HardwareHints {
 
 export function detectHardwareHints(): HardwareHints {
   const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  const hardwareConcurrency = navigator.hardwareConcurrency;
   const gpu = detectGpu();
   return {
     gpu,
-    cores: navigator.hardwareConcurrency || 4,
+    logicalProcessors: Number.isInteger(hardwareConcurrency) && hardwareConcurrency > 0
+      ? hardwareConcurrency
+      : undefined,
     // En Apple Silicon el chip es CPU y GPU a la vez: sirve para pre-llenar el modelo de CPU
     cpuModelHint: gpu.vendor === 'Apple' && /Apple M\d/i.test(gpu.model) ? gpu.model : undefined,
     // deviceMemory (solo Chrome) esta topado en 8 GB: sirve como pre-llenado, no como dato final
@@ -119,19 +154,17 @@ export async function getSystemInfo(): Promise<SystemInfo> {
   const hints = detectHardwareHints();
   const overrides = loadHardwareOverrides();
 
-  if (!overrides.cpuModel || !overrides.ramGb) {
-    throw new Error('Completa el modelo de CPU y la RAM en el formulario de hardware antes de analizar.');
+  if (!overrides.cpuModel || !overrides.cpuCores || !overrides.ramGb) {
+    throw new Error('Completa el modelo, los nucleos de CPU y la RAM en el formulario de hardware antes de analizar.');
   }
 
   return {
     cpu: {
       model: overrides.cpuModel,
-      cores: hints.cores,
-      speed: 3, // ponytail: el navegador no expone la frecuencia; 3 GHz nominal cumple la validacion del servidor
+      cores: overrides.cpuCores,
     },
     gpu: {
       model: hints.gpu.model,
-      vram: 0, // ponytail: VRAM no detectable en navegador; 0 = desconocido y es valido para la API
       vendor: hints.gpu.vendor,
       hasNvenc: hints.gpu.hasNvenc,
     },

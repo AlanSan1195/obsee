@@ -1,6 +1,6 @@
 import type { ConsoleComponentSpec, ConsoleModel, ConsoleProfileRequest, ConsoleProfileResponse } from './types';
-import { getLocalRecommendation } from './localRecommendation';
-import { parseResolution } from './validation';
+import { getLocalRecommendation, getPreferredEncoder } from './localRecommendation';
+import { parseResolution, validateConsoleProfileResponse } from './validation';
 
 // Respaldo offline del analisis de consola: sin IA ni web, infiere capacidades a
 // partir de constantes conocidas de cada consola y de palabras clave del nombre
@@ -25,6 +25,143 @@ function resPixels(res: string): number {
 
 function minResolution(a: string, b: string): string {
   return resPixels(a) <= resPixels(b) ? a : b;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isKnownMonitorName(value: string): boolean {
+  return value.trim().length > 2
+    && !/^(unknown|desconocido|display|monitor|default)/i.test(value.trim());
+}
+
+// La IA aporta contexto y explicaciones, pero los datos que OBS leyó directamente
+// de la capturadora y el encoder disponible en la PC son deterministas. Esta capa
+// evita que un modelo pequeño los contradiga al generar el JSON.
+export function normalizeConsoleProfileForRequest(
+  request: ConsoleProfileRequest,
+  response: ConsoleProfileResponse,
+): ConsoleProfileResponse {
+  const consoleInfo = CONSOLE_CAPS[request.console];
+  const consoleCaps = consoleInfo.caps;
+  const verifiedCaptureResolution = request.captureMaxResolution
+    ? minResolution(consoleCaps.resolution, request.captureMaxResolution)
+    : minResolution(consoleCaps.resolution, response.profile.captureResolution);
+  const verifiedCaptureFps = Math.min(
+    consoleCaps.fps,
+    request.captureMaxFps ?? response.profile.captureFps,
+  );
+  const streamResolution = minResolution(response.recommendations.resolution, verifiedCaptureResolution);
+  const recordingResolution = request.mode === 'stream_only'
+    ? streamResolution
+    : verifiedCaptureResolution;
+  const preferredEncoder = getPreferredEncoder(request.systemInfo);
+  const hasVerifiedCaptureCaps = Boolean(request.captureMaxResolution);
+  const captureLimitsConsole = resPixels(verifiedCaptureResolution) < resPixels(consoleCaps.resolution)
+    || verifiedCaptureFps < consoleCaps.fps;
+  const bottleneck = hasVerifiedCaptureCaps
+    ? captureLimitsConsole
+      ? `OBS verifico que la capturadora fija el techo de captura en ${verifiedCaptureResolution} a ${verifiedCaptureFps}fps. El monitor solo afecta el passthrough y no reduce la grabacion de OBS.`
+      : `OBS verifico captura hasta ${verifiedCaptureResolution} a ${verifiedCaptureFps}fps sin un limite inferior al de la consola. El monitor solo afecta el passthrough.`
+    : response.profile.bottleneck;
+  const sourceCount = response.profile.sources?.length ?? 0;
+  const evidence = sourceCount > 0
+    ? `Se contrastaron ${sourceCount} fuentes web y luego se priorizaron las capacidades reales leidas por OBS.`
+    : 'No hubo fuentes web verificadas; se priorizaron las capacidades reales leidas por OBS y el hardware confirmado.';
+  const reasoning = `${evidence} Configuracion final: lienzo ${verifiedCaptureResolution}, stream ${streamResolution}, grabacion ${recordingResolution}, ${Math.min(response.recommendations.fps, verifiedCaptureFps)}fps y encoder ${preferredEncoder}.`;
+  const monitorIsKnown = isKnownMonitorName(request.monitor ?? '');
+
+  return {
+    ...response,
+    profile: {
+      ...response.profile,
+      console: {
+        ...response.profile.console,
+        name: consoleInfo.name,
+        identified: true,
+        maxResolution: consoleCaps.resolution,
+        maxFps: consoleCaps.fps,
+        hdr: consoleInfo.hdr,
+        vrr: consoleInfo.vrr,
+      },
+      captureResolution: verifiedCaptureResolution,
+      captureFps: verifiedCaptureFps,
+      bottleneck,
+      captureCard: {
+        ...response.profile.captureCard,
+        name: request.captureCard ?? response.profile.captureCard.name,
+        maxResolution: request.captureMaxResolution ?? response.profile.captureCard.maxResolution,
+        maxFps: request.captureMaxFps ?? response.profile.captureCard.maxFps,
+      },
+      monitor: monitorIsKnown ? response.profile.monitor : {
+        ...response.profile.monitor,
+        name: request.monitor ?? 'Monitor desconocido',
+        identified: false,
+        summary: 'Monitor no identificado; no se usa como techo de captura de OBS.',
+      },
+    },
+    recommendations: {
+      ...response.recommendations,
+      canvas_resolution: verifiedCaptureResolution,
+      resolution: streamResolution,
+      recording_resolution: recordingResolution,
+      fps: Math.min(response.recommendations.fps, verifiedCaptureFps),
+      encoder: preferredEncoder,
+    },
+    reasoning,
+  };
+}
+
+// Los modelos locales pequeños pueden responder el perfil descriptivo completo
+// pero omitir parte de `recommendations`. Conservamos su análisis y completamos
+// exclusivamente los ajustes ausentes con el perfil determinista local. Si los
+// valores parciales siguen siendo inválidos, usamos el bloque local completo sin
+// descartar el perfil descriptivo que sí produjo la IA.
+export function resolveConsoleProfileResponse(
+  request: ConsoleProfileRequest,
+  payload: unknown,
+): ConsoleProfileResponse {
+  const local = getLocalConsoleProfile(request);
+  const direct = validateConsoleProfileResponse(payload);
+  if (direct.success) {
+    return normalizeConsoleProfileForRequest(request, direct.value);
+  }
+
+  if (!isRecord(payload) || !isRecord(payload.profile)) {
+    return local;
+  }
+
+  const partialRecommendations = isRecord(payload.recommendations)
+    ? payload.recommendations
+    : {};
+  const completedReasoning = typeof payload.reasoning === 'string' && payload.reasoning.trim().length > 0
+    ? payload.reasoning
+    : `La IA identifico la cadena de consola y captura. Los ajustes de OBS que faltaban se completaron localmente usando el hardware y las capacidades detectadas.`;
+  const completed = validateConsoleProfileResponse({
+    ...payload,
+    source: 'ai',
+    recommendations: {
+      ...local.recommendations,
+      ...partialRecommendations,
+    },
+    reasoning: completedReasoning,
+  });
+
+  if (completed.success) {
+    return normalizeConsoleProfileForRequest(request, completed.value);
+  }
+
+  const withLocalRecommendations = validateConsoleProfileResponse({
+    ...payload,
+    source: 'ai',
+    recommendations: local.recommendations,
+    reasoning: completedReasoning,
+  });
+
+  return withLocalRecommendations.success
+    ? normalizeConsoleProfileForRequest(request, withLocalRecommendations.value)
+    : local;
 }
 
 function inferFromName(name: string | undefined, fallback: Caps): { caps: Caps; identified: boolean } {
@@ -82,9 +219,13 @@ export function getLocalConsoleProfile(request: ConsoleProfileRequest): ConsoleP
     mode: request.mode,
     platform: request.platform,
   }).recommendations;
+  const streamResolution = minResolution(base.resolution, captureResolution);
+  const wantsRecording = request.mode !== 'stream_only';
   const recommendations = {
     ...base,
-    resolution: minResolution(base.resolution, captureResolution),
+    canvas_resolution: captureResolution,
+    resolution: streamResolution,
+    recording_resolution: wantsRecording ? captureResolution : streamResolution,
     fps: Math.min(base.fps, captureFps),
   };
 
@@ -137,6 +278,6 @@ export function getLocalConsoleProfile(request: ConsoleProfileRequest): ConsoleP
       ],
     },
     recommendations,
-    reasoning: `Perfil de consola generado localmente (la IA no estuvo disponible). ${bottleneck}`,
+    reasoning: `Perfil de consola generado localmente (la IA no estuvo disponible). ${bottleneck} Lienzo ${recommendations.canvas_resolution}, stream ${recommendations.resolution} y grabacion ${recommendations.recording_resolution}.`,
   };
 }

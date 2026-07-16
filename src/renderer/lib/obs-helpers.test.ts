@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   areObsrecFiltersConfigured,
   collectDuckingInputCandidates,
+  getAdvancedEncoderId,
   getSimpleEncoderId,
   getSimpleRecordingQuality,
   getStreamServer,
@@ -57,6 +58,16 @@ describe('getSimpleEncoderId', () => {
     expect(getSimpleEncoderId('apple vt h264')).toBe('apple_h264');
     expect(getSimpleEncoderId('videotoolbox')).toBe('apple_h264');
     expect(getSimpleEncoderId('desconocido')).toBeNull();
+  });
+});
+
+describe('getAdvancedEncoderId', () => {
+  it('mapea Apple y los encoders de hardware a IDs avanzados de OBS', () => {
+    expect(getAdvancedEncoderId('apple vt h264')).toBe('com.apple.videotoolbox.videoencoder.ave.avc');
+    expect(getAdvancedEncoderId('nvenc h264')).toBe('ffmpeg_nvenc');
+    expect(getAdvancedEncoderId('qsv')).toBe('obs_qsv11');
+    expect(getAdvancedEncoderId('amd')).toBe('h264_texture_amf');
+    expect(getAdvancedEncoderId('x264')).toBe('obs_x264');
   });
 });
 

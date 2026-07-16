@@ -26,6 +26,7 @@ import {
   getDuckingFilter,
   MANAGED_MIC_FILTER_NAMES,
   getFilterSettings,
+  getAdvancedEncoderId,
   getNumberSetting,
   getOptionalString,
   getSimpleEncoderId,
@@ -197,11 +198,20 @@ export class OBSManager {
       const streamServiceSettings = streamSettings.streamServiceSettings as Record<string, unknown>;
       const profileSettings: Record<string, string> = {};
       const profileRequests = [
+        { key: 'outputMode', category: 'Output', name: 'Mode' },
         { key: 'encoder', category: 'SimpleOutput', name: 'StreamEncoder' },
         { key: 'bitrate', category: 'SimpleOutput', name: 'VBitrate' },
         { key: 'audioBitrate', category: 'SimpleOutput', name: 'ABitrate' },
         { key: 'recordingFormat', category: 'SimpleOutput', name: 'RecFormat' },
+        { key: 'recordingFormat2', category: 'SimpleOutput', name: 'RecFormat2' },
         { key: 'recordingQuality', category: 'SimpleOutput', name: 'RecQuality' },
+        { key: 'advancedStreamEncoder', category: 'AdvOut', name: 'Encoder' },
+        { key: 'advancedRecordingEncoder', category: 'AdvOut', name: 'RecEncoder' },
+        { key: 'advancedStreamResolution', category: 'AdvOut', name: 'RescaleRes' },
+        { key: 'advancedRecordingResolution', category: 'AdvOut', name: 'RecRescaleRes' },
+        { key: 'advancedStreamFilter', category: 'AdvOut', name: 'RescaleFilter' },
+        { key: 'advancedRecordingFilter', category: 'AdvOut', name: 'RecRescaleFilter' },
+        { key: 'advancedRecordingFormat', category: 'AdvOut', name: 'RecFormat2' },
       ];
 
       await Promise.all(profileRequests.map(async (request) => {
@@ -218,6 +228,16 @@ export class OBSManager {
 
       const fpsDenominator = videoSettings.fpsDenominator || 1;
       const fps = Math.round(videoSettings.fpsNumerator / fpsDenominator);
+      const outputMode = profileSettings.outputMode === 'Advanced' ? 'Advanced' : 'Simple';
+      const outputResolution = `${videoSettings.outputWidth}x${videoSettings.outputHeight}`;
+      const streamRescaleEnabled = outputMode === 'Advanced' && Number(profileSettings.advancedStreamFilter) > 0;
+      const recordingRescaleEnabled = outputMode === 'Advanced' && Number(profileSettings.advancedRecordingFilter) > 0;
+      const streamResolution = streamRescaleEnabled && profileSettings.advancedStreamResolution
+        ? profileSettings.advancedStreamResolution
+        : outputResolution;
+      const recordingResolution = recordingRescaleEnabled && profileSettings.advancedRecordingResolution
+        ? profileSettings.advancedRecordingResolution
+        : outputResolution;
 
       const audioResult = await this.getAudioSnapshot();
 
@@ -227,13 +247,29 @@ export class OBSManager {
         snapshot: {
           streamServer: getStringSetting(streamServiceSettings, 'server'),
           baseResolution: `${videoSettings.baseWidth}x${videoSettings.baseHeight}`,
-          outputResolution: `${videoSettings.outputWidth}x${videoSettings.outputHeight}`,
+          outputResolution,
+          streamResolution,
+          recordingResolution,
+          outputMode,
+          advancedOutput: outputMode === 'Advanced' ? {
+            streamEncoder: profileSettings.advancedStreamEncoder || '',
+            recordingEncoder: profileSettings.advancedRecordingEncoder || '',
+            streamRescaleResolution: profileSettings.advancedStreamResolution || outputResolution,
+            recordingRescaleResolution: profileSettings.advancedRecordingResolution || outputResolution,
+            streamRescaleFilter: profileSettings.advancedStreamFilter || '0',
+            recordingRescaleFilter: profileSettings.advancedRecordingFilter || '0',
+            recordingFormat: profileSettings.advancedRecordingFormat || '',
+          } : undefined,
           fps,
-          encoder: profileSettings.encoder || 'Unknown',
+          encoder: outputMode === 'Advanced'
+            ? profileSettings.advancedStreamEncoder || 'Unknown'
+            : profileSettings.encoder || 'Unknown',
           bitrate: getNumberSetting(profileSettings, 'bitrate'),
           audioBitrate: getNumberSetting(profileSettings, 'audioBitrate'),
-          recordingFormat: profileSettings.recordingFormat || 'Unknown',
-          recordingQuality: profileSettings.recordingQuality || 'Unknown',
+          recordingFormat: outputMode === 'Advanced'
+            ? profileSettings.advancedRecordingFormat || 'Unknown'
+            : profileSettings.recordingFormat2 || profileSettings.recordingFormat || 'Unknown',
+          recordingQuality: outputMode === 'Advanced' ? 'advanced' : profileSettings.recordingQuality || 'Unknown',
           audio: audioResult.success ? audioResult.snapshot : undefined,
         },
       };
@@ -450,34 +486,75 @@ export class OBSManager {
         });
       }
 
-      const resolution = parseResolution(config.resolution);
-      if (!resolution.success) {
-        return { success: false, message: resolution.message };
-      }
+      const canvasResolution = parseResolution(config.canvasResolution ?? config.resolution);
+      if (!canvasResolution.success) return { success: false, message: canvasResolution.message };
+      const streamResolution = parseResolution(config.streamResolution ?? config.resolution);
+      if (!streamResolution.success) return { success: false, message: streamResolution.message };
+      const recordingResolution = parseResolution(config.recordingResolution ?? config.resolution);
+      if (!recordingResolution.success) return { success: false, message: recordingResolution.message };
 
-      const { width, height } = resolution.value;
+      const normalizedStreamResolution = `${streamResolution.value.width}x${streamResolution.value.height}`;
+      const normalizedRecordingResolution = `${recordingResolution.value.width}x${recordingResolution.value.height}`;
+
+      const outputResolution = config.mode === 'stream_only'
+        ? streamResolution.value
+        : recordingResolution.value;
       await this.obs.call('SetVideoSettings', {
-        baseWidth: width,
-        baseHeight: height,
-        outputWidth: width,
-        outputHeight: height,
+        baseWidth: canvasResolution.value.width,
+        baseHeight: canvasResolution.value.height,
+        outputWidth: outputResolution.width,
+        outputHeight: outputResolution.height,
         fpsNumerator: config.fps,
         fpsDenominator: 1,
       });
 
-      const encoderId = getSimpleEncoderId(config.encoder);
-      const profileUpdates = [
-        { category: 'Output', name: 'Mode', value: 'Simple' },
-        { category: 'SimpleOutput', name: 'VBitrate', value: String(config.bitrate) },
-        { category: 'SimpleOutput', name: 'ABitrate', value: String(config.audioBitrate) },
-        { category: 'SimpleOutput', name: 'RecFormat', value: config.recordingFormat },
-        { category: 'SimpleOutput', name: 'RecQuality', value: getSimpleRecordingQuality(config.recordingQuality) },
-      ];
+      const hasIndependentOutputs = config.mode === 'stream_record'
+        && (streamResolution.value.width !== recordingResolution.value.width
+          || streamResolution.value.height !== recordingResolution.value.height);
+      const profileUpdates: Array<{ category: string; name: string; value: string }> = [];
 
-      if (encoderId) {
-        profileUpdates.push({ category: 'SimpleOutput', name: 'StreamEncoder', value: encoderId });
+      if (hasIndependentOutputs) {
+        const advancedEncoderId = getAdvancedEncoderId(config.encoder);
+        profileUpdates.push(
+          { category: 'Output', name: 'Mode', value: 'Advanced' },
+          { category: 'AdvOut', name: 'ApplyServiceSettings', value: 'true' },
+          { category: 'AdvOut', name: 'RescaleRes', value: normalizedStreamResolution },
+          // OBS_SCALE_LANCZOS = 4. Cualquier valor distinto de 0 activa el escalado por encoder.
+          { category: 'AdvOut', name: 'RescaleFilter', value: '4' },
+          { category: 'AdvOut', name: 'TrackIndex', value: '1' },
+          { category: 'AdvOut', name: 'RecType', value: 'Standard' },
+          { category: 'AdvOut', name: 'RecFormat2', value: config.recordingFormat },
+          { category: 'AdvOut', name: 'RecRescaleRes', value: normalizedRecordingResolution },
+          { category: 'AdvOut', name: 'RecRescaleFilter', value: '0' },
+          { category: 'AdvOut', name: 'RecTracks', value: '1' },
+          { category: 'AdvOut', name: 'Track1Bitrate', value: String(config.audioBitrate) },
+        );
+
+        if (advancedEncoderId) {
+          profileUpdates.push(
+            { category: 'AdvOut', name: 'Encoder', value: advancedEncoderId },
+            { category: 'AdvOut', name: 'RecEncoder', value: advancedEncoderId },
+          );
+        } else {
+          warnings.push(`Encoder "${config.encoder}" was not mapped to an OBS Advanced Output encoder.`);
+        }
+
+        warnings.push(`OBS quedo en modo avanzado para grabar a ${normalizedRecordingResolution} y transmitir a ${normalizedStreamResolution}. Revisa una vez los controles avanzados de bitrate/calidad del encoder; obs-websocket no expone esos archivos internos.`);
       } else {
-        warnings.push(`Encoder "${config.encoder}" was not mapped to an OBS Simple Output encoder.`);
+        const encoderId = getSimpleEncoderId(config.encoder);
+        profileUpdates.push(
+          { category: 'Output', name: 'Mode', value: 'Simple' },
+          { category: 'SimpleOutput', name: 'VBitrate', value: String(config.bitrate) },
+          { category: 'SimpleOutput', name: 'ABitrate', value: String(config.audioBitrate) },
+          { category: 'SimpleOutput', name: 'RecFormat2', value: config.recordingFormat },
+          { category: 'SimpleOutput', name: 'RecQuality', value: getSimpleRecordingQuality(config.recordingQuality) },
+        );
+
+        if (encoderId) {
+          profileUpdates.push({ category: 'SimpleOutput', name: 'StreamEncoder', value: encoderId });
+        } else {
+          warnings.push(`Encoder "${config.encoder}" was not mapped to an OBS Simple Output encoder.`);
+        }
       }
 
       for (const update of profileUpdates) {
@@ -560,16 +637,29 @@ export class OBSManager {
         }
       }
 
-      const profileUpdates = [
-        { category: 'Output', name: 'Mode', value: 'Simple' },
-        { category: 'SimpleOutput', name: 'VBitrate', value: snapshot.bitrate > 0 ? String(snapshot.bitrate) : '' },
-        { category: 'SimpleOutput', name: 'ABitrate', value: snapshot.audioBitrate > 0 ? String(snapshot.audioBitrate) : '' },
-        { category: 'SimpleOutput', name: 'RecFormat', value: snapshot.recordingFormat },
-        { category: 'SimpleOutput', name: 'RecQuality', value: snapshot.recordingQuality },
-        { category: 'SimpleOutput', name: 'StreamEncoder', value: snapshot.encoder },
-      ].filter((update) => update.value && update.value !== 'Unknown');
+      const profileUpdates = snapshot.outputMode === 'Advanced' && snapshot.advancedOutput
+        ? [
+          { category: 'Output', name: 'Mode', value: 'Advanced' },
+          { category: 'AdvOut', name: 'Encoder', value: snapshot.advancedOutput.streamEncoder },
+          { category: 'AdvOut', name: 'RecEncoder', value: snapshot.advancedOutput.recordingEncoder },
+          { category: 'AdvOut', name: 'RescaleRes', value: snapshot.advancedOutput.streamRescaleResolution },
+          { category: 'AdvOut', name: 'RecRescaleRes', value: snapshot.advancedOutput.recordingRescaleResolution },
+          { category: 'AdvOut', name: 'RescaleFilter', value: snapshot.advancedOutput.streamRescaleFilter },
+          { category: 'AdvOut', name: 'RecRescaleFilter', value: snapshot.advancedOutput.recordingRescaleFilter },
+          { category: 'AdvOut', name: 'RecFormat2', value: snapshot.advancedOutput.recordingFormat },
+        ]
+        : [
+          { category: 'Output', name: 'Mode', value: 'Simple' },
+          { category: 'SimpleOutput', name: 'VBitrate', value: snapshot.bitrate > 0 ? String(snapshot.bitrate) : '' },
+          { category: 'SimpleOutput', name: 'ABitrate', value: snapshot.audioBitrate > 0 ? String(snapshot.audioBitrate) : '' },
+          { category: 'SimpleOutput', name: 'RecFormat2', value: snapshot.recordingFormat },
+          { category: 'SimpleOutput', name: 'RecQuality', value: snapshot.recordingQuality },
+          { category: 'SimpleOutput', name: 'StreamEncoder', value: snapshot.encoder },
+        ];
 
-      for (const update of profileUpdates) {
+      const restorableProfileUpdates = profileUpdates.filter((update) => update.value && update.value !== 'Unknown');
+
+      for (const update of restorableProfileUpdates) {
         try {
           await this.obs.call('SetProfileParameter', {
             parameterCategory: update.category,

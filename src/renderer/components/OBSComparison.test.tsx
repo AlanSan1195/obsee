@@ -15,7 +15,9 @@ const snapshot: OBSSettingsSnapshot = {
 };
 
 const recommendations: AIRecommendation['recommendations'] = {
+  canvas_resolution: '3840x2160',
   resolution: '1920x1080',
+  recording_resolution: '3840x2160',
   fps: 60,
   encoder: 'nvenc',
   bitrate: 6000,
@@ -48,7 +50,9 @@ describe('buildComparisonRows', () => {
   it('construye filas comparables desde snapshot y recomendacion', () => {
     const rows = buildComparisonRows(snapshot, recommendations);
 
-    expect(rows).toHaveLength(8);
-    expect(rows.every(isSameValue)).toBe(true);
+    expect(rows).toHaveLength(9);
+    expect(rows.find((row) => row.label === 'Lienzo base')?.recommended).toBe('3840x2160');
+    expect(rows.find((row) => row.label === 'Salida del stream')?.recommended).toBe('1920x1080');
+    expect(rows.find((row) => row.label === 'Salida maestra / grabacion')?.recommended).toBe('3840x2160');
   });
 });

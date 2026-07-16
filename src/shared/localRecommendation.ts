@@ -1,10 +1,10 @@
-import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationField, AIRecommendationRequest, AIRecommendationSettings } from './types';
+import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationField, AIRecommendationRequest, AIRecommendationSettings, SystemInfo } from './types';
 
-function getEncoder(request: AIRecommendationRequest): string {
-  const vendor = request.systemInfo.gpu.vendor.toLowerCase();
-  const model = request.systemInfo.gpu.model.toLowerCase();
+export function getPreferredEncoder(systemInfo: SystemInfo): string {
+  const vendor = systemInfo.gpu.vendor.toLowerCase();
+  const model = systemInfo.gpu.model.toLowerCase();
 
-  if (request.systemInfo.gpu.hasNvenc || vendor.includes('nvidia')) return 'nvenc';
+  if (systemInfo.gpu.hasNvenc || vendor.includes('nvidia')) return 'nvenc';
   if (vendor.includes('apple') || model.includes('apple')) return 'apple vt h264';
   if (vendor.includes('intel')) return 'qsv';
   if (vendor.includes('amd')) return 'amd';
@@ -18,9 +18,10 @@ function readResolutionDims(resolution: string): { width: number; height: number
   return { width, height };
 }
 
-function getHardwareVideoProfile(request: AIRecommendationRequest) {
+function getHardwareVideoProfile(request: AIRecommendationRequest, encoder: string) {
   const { cpu, ram } = request.systemInfo;
-  const canUse1080p60 = cpu.cores >= 8 && ram.total >= 16;
+  const hasHardwareEncoder = encoder !== 'x264';
+  const canUse1080p60 = ram.total >= 16 && (hasHardwareEncoder || cpu.cores >= 8);
   const wantsRecording = request.mode !== 'stream_only';
 
   if (canUse1080p60) {
@@ -41,8 +42,8 @@ function getHardwareVideoProfile(request: AIRecommendationRequest) {
 // Combina lo que OBS ya tiene configurado (afinado por su asistente inicial segun
 // hardware y red) con el techo seguro del hardware: respeta la config del usuario
 // salvo que supere lo que su equipo puede sostener.
-function getVideoProfile(request: AIRecommendationRequest) {
-  const hardware = getHardwareVideoProfile(request);
+function getVideoProfile(request: AIRecommendationRequest, encoder: string) {
+  const hardware = getHardwareVideoProfile(request, encoder);
   const baseline = request.currentSettings;
   if (!baseline) {
     return { ...hardware, usedBaseline: false };
@@ -71,9 +72,9 @@ function getVideoProfile(request: AIRecommendationRequest) {
 }
 
 export function getLocalRecommendation(request: AIRecommendationRequest): AIRecommendation {
-  const videoProfile = getVideoProfile(request);
-  const encoder = getEncoder(request);
-  const recordingQuality = request.mode === 'record_only' ? 'high' : 'stream';
+  const encoder = getPreferredEncoder(request.systemInfo);
+  const videoProfile = getVideoProfile(request, encoder);
+  const recordingQuality = request.mode === 'stream_only' ? 'stream' : 'high';
 
   const reasoning = videoProfile.usedBaseline
     ? 'Recomendacion local basada en la configuracion que OBS ya tenia (definida en su asistente inicial segun tu hardware y red), ajustando el encoder al optimo de tu equipo (la IA no estuvo disponible).'
@@ -82,7 +83,9 @@ export function getLocalRecommendation(request: AIRecommendationRequest): AIReco
   return {
     source: 'local',
     recommendations: {
+      canvas_resolution: videoProfile.resolution,
       resolution: videoProfile.resolution,
+      recording_resolution: videoProfile.resolution,
       fps: videoProfile.fps,
       encoder,
       bitrate: videoProfile.bitrate,
@@ -95,7 +98,9 @@ export function getLocalRecommendation(request: AIRecommendationRequest): AIReco
 }
 
 const fieldLabels: Record<AIRecommendationField, string> = {
-  resolution: 'resolucion',
+  canvas_resolution: 'lienzo base',
+  resolution: 'resolucion del stream',
+  recording_resolution: 'resolucion de grabacion',
   fps: 'FPS',
   encoder: 'encoder',
   bitrate: 'bitrate de video',
@@ -111,7 +116,9 @@ function readResolutionPixels(resolution: string): number {
 }
 
 function getWorkload(settings: AIRecommendationSettings): number {
-  return readResolutionPixels(settings.resolution) * settings.fps;
+  const streamPixels = readResolutionPixels(settings.resolution);
+  const recordingPixels = readResolutionPixels(settings.recording_resolution);
+  return Math.max(streamPixels, recordingPixels) * settings.fps;
 }
 
 function getBitrateGuidance(settings: AIRecommendationSettings, platform: AIRecommendationRequest['platform']): string {

@@ -1,35 +1,14 @@
-import Groq from 'groq-sdk';
-import type { AIRecommendationExplanationRequest, AIRecommendationRequest, AIServiceMessage, ConsoleProfileRequest, MicProfileRequest } from '../../src/shared/types';
+import { chatWithAI, getAIProvider } from './ai-provider';
+import type { AIRecommendationExplanationRequest, AIRecommendationRequest, ConsoleProfileRequest, MicProfileRequest } from '../../src/shared/types';
 
-let groqInstance: Groq | null = null;
-
-function getGroqClient(): Groq {
-  if (!groqInstance) {
-    const apiKey = process.env.GROQ_API_KEY || '';
-    if (!apiKey) {
-      throw new Error('GROQ_API_KEY is not configured on the backend.');
-    }
-    groqInstance = new Groq({ apiKey });
+function formatGpuMemory(systemInfo: AIRecommendationRequest['systemInfo']): string {
+  if (systemInfo.gpu.vram !== undefined && systemInfo.gpu.vram > 0) {
+    return `${systemInfo.gpu.vram}MB VRAM`;
   }
-  return groqInstance;
-}
 
-// maxTokens: usar null para NO enviar el parametro. Los sistemas agentic
-// (groq/compound) rechazan la peticion con "request_too_large" si se reserva
-// max_tokens, porque el modelo subyacente + la busqueda web exceden el limite
-// por peticion. Para esos casos se omite.
-type ChatOptions = { model?: string; temperature?: number; maxTokens?: number | null };
-
-async function chat(messages: AIServiceMessage[], options: ChatOptions = {}): Promise<string> {
-  const maxTokens = options.maxTokens === undefined ? 4000 : options.maxTokens;
-  const completion = await getGroqClient().chat.completions.create({
-    messages,
-    model: options.model || process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
-    temperature: options.temperature ?? 0.7,
-    ...(maxTokens === null ? {} : { max_tokens: maxTokens }),
-  });
-
-  return completion.choices[0]?.message?.content ?? '';
+  return systemInfo.gpu.vendor.toLowerCase() === 'apple'
+    ? 'memoria unificada (VRAM separada no disponible)'
+    : 'VRAM desconocida';
 }
 
 export function parseJsonObject(value: string): unknown {
@@ -41,7 +20,10 @@ export function parseJsonObject(value: string): unknown {
   return JSON.parse(match[0]);
 }
 
-async function searchWeb(query: string): Promise<{ results: string[]; sources: string[] }> {
+async function searchWeb(
+  query: string,
+  includeDomains: string[] = [],
+): Promise<{ results: string[]; sources: string[] }> {
   const apiKey = process.env.TAVILY_API_KEY;
   if (!apiKey) {
     console.warn('[tavily] TAVILY_API_KEY not configured, skipping web search');
@@ -52,7 +34,10 @@ async function searchWeb(query: string): Promise<{ results: string[]; sources: s
   const trustedDomains = [
     // Oficiales y manuales
     'support.', 'manual.', 'manuals.', 'specs.', 'specifications.',
+    'playstation.com', 'xbox.com', 'nintendo.com', 'sony.com',
     'ugreen.', 'elgato.', 'avermedia.', 'razer.', 'cam-link.',
+    'magewell.', 'blackmagicdesign.', 'atomos.', 'corsair.', 'nzxt.',
+    'lg.com', 'samsung.com', 'asus.com', 'acer.com', 'dell.com', 'benq.com', 'msi.com',
     // Retailers grandes
     'amazon.', 'mercadolibre.', 'aliexpress.', 'newegg.', 'bhphotovideo.',
     'adorama.', 'b&h.', 'sweetwater.', 'bestbuy.', 'walmart.',
@@ -60,7 +45,19 @@ async function searchWeb(query: string): Promise<{ results: string[]; sources: s
     'rtings.', 'techpowerup.', 'anandtech.', 'overclock.net',
   ];
 
+  const isValidUrl = (url: string): boolean => {
+    try {
+      const parsed = new URL(url);
+      return ['http:', 'https:'].includes(parsed.protocol)
+        && parsed.hostname.length > 3
+        && !url.includes('...');
+    } catch {
+      return false;
+    }
+  };
+
   const isUrlTrusted = (url: string): boolean => {
+    if (!isValidUrl(url)) return false;
     const domain = new URL(url).hostname.toLowerCase();
     return trustedDomains.some((trusted) => domain.includes(trusted));
   };
@@ -74,6 +71,7 @@ async function searchWeb(query: string): Promise<{ results: string[]; sources: s
         query,
         max_results: 8, // Buscar más para filtrar después
         include_answer: false,
+        ...(includeDomains.length > 0 ? { include_domains: includeDomains } : {}),
       }),
     });
 
@@ -82,16 +80,19 @@ async function searchWeb(query: string): Promise<{ results: string[]; sources: s
       return { results: [], sources: [] };
     }
 
-    const data = await response.json() as { results?: Array<{ content: string; url: string }> };
-    const allResults = data.results ?? [];
+    const data = await response.json() as { results?: Array<{ content: string; url: string; score?: number }> };
+    const allResults = (data.results ?? []).filter((result) => isValidUrl(result.url));
 
-    // Filtrar solo fuentes confiables
+    // Prioriza fuentes conocidas. Para hardware nuevo o de marcas menos comunes,
+    // conserva resultados de alta relevancia en lugar de fingir que no se navego.
     const trusted = allResults.filter((r) => isUrlTrusted(r.url));
-    const results = trusted.map((r) => r.content);
-    const sources = trusted.map((r) => r.url);
+    const relevant = allResults.filter((r) => !trusted.includes(r) && (r.score ?? 0) >= 0.6);
+    const selected = [...trusted, ...relevant].slice(0, 4);
+    const results = selected.map((r) => r.content);
+    const sources = selected.map((r) => r.url);
 
     console.log(`[tavily] Busqueda: "${query}"`);
-    console.log(`[tavily] Encontrados: ${allResults.length} totales, ${sources.length} confiables`);
+    console.log(`[tavily] Encontrados: ${allResults.length} totales, ${sources.length} seleccionados`);
 
     return { results, sources };
   } catch (error) {
@@ -122,15 +123,23 @@ Preferencias del usuario:
 
 Hardware disponible:
 - CPU: ${systemInfo.cpu.model} (${systemInfo.cpu.cores} cores)
-- GPU: ${systemInfo.gpu.model} ${systemInfo.gpu.vram}MB VRAM (Vendor: ${systemInfo.gpu.vendor})
+- GPU: ${systemInfo.gpu.model} ${formatGpuMemory(systemInfo)} (Vendor: ${systemInfo.gpu.vendor})
 - RAM: ${systemInfo.ram.total}GB
 - OS: ${systemInfo.os.distro} ${systemInfo.os.release}
 - Hardware NVENC disponible: ${systemInfo.gpu.hasNvenc ? 'Si' : 'No'}
 ${baselineSection}
+Campos de resolucion:
+- "canvas_resolution": lienzo base donde se acomodan las fuentes.
+- "resolution": resolucion exclusiva del stream.
+- "recording_resolution": resolucion del archivo grabado.
+- Si el modo incluye stream y grabacion, separa ambas salidas cuando ayude a conservar calidad de grabacion sin exceder la plataforma de streaming.
+
 Responde en JSON con este formato exacto, sin texto adicional:
 {
   "recommendations": {
+    "canvas_resolution": "1920x1080",
     "resolution": "1920x1080",
+    "recording_resolution": "1920x1080",
     "fps": 60,
     "encoder": "nvenc",
     "bitrate": 6000,
@@ -141,7 +150,7 @@ Responde en JSON con este formato exacto, sin texto adicional:
   "reasoning": "Explicacion de por que esta configuracion es optima para este hardware"
 }`;
 
-  const response = await chat([
+  const response = await chatWithAI([
     { role: 'system', content: 'Eres un experto en configuracion de OBS. Responde solo en JSON valido.' },
     { role: 'user', content: prompt },
   ]);
@@ -199,7 +208,7 @@ export async function getMicProfileFromGroq(request: MicProfileRequest): Promise
   }
 
   // Intento 2: GROQ_SEARCH_MODEL como fallback
-  if (!webContext && process.env.GROQ_SEARCH_MODEL) {
+  if (!webContext && getAIProvider() === 'groq' && process.env.GROQ_SEARCH_MODEL) {
     try {
       const webPrompt = `Eres un ingeniero de audio experto en OBS. Busca en la web las especificaciones OFICIALES del microfono indicado.
 ${buildMicContext(request)}
@@ -211,7 +220,7 @@ ${MIC_PROFILE_RULES}
 
 ${MIC_PROFILE_JSON_SHAPE}`;
 
-      const response = await chat(
+      const response = await chatWithAI(
         [
           { role: 'system', content: 'Eres un ingeniero de audio experto en OBS. Usas busqueda web para confirmar specs y respondes solo en JSON valido.' },
           { role: 'user', content: webPrompt },
@@ -235,7 +244,7 @@ ${webContext ? `- Usa esta informacion navegada para confirmar specs:\n${webCont
 
 ${MIC_PROFILE_JSON_SHAPE}`;
 
-  const response = await chat(
+  const response = await chatWithAI(
     [
       { role: 'system', content: 'Eres un ingeniero de audio experto en OBS. Respondes solo en JSON valido.' },
       { role: 'user', content: knowledgePrompt },
@@ -245,8 +254,10 @@ ${MIC_PROFILE_JSON_SHAPE}`;
 
   const result = parseJsonObject(response) as any;
   // Si navegamos via Tavily, agregar las sources encontradas
-  if (webSources.length > 0 && result.profile) {
-    result.profile.sources = [...(result.profile.sources ?? []), ...webSources].slice(0, 3);
+  if (result.profile) {
+    // Solo se publican URLs que realmente devolvio Tavily. Un modelo local no
+    // puede declarar por si mismo que navego ni inventar fuentes.
+    result.profile.sources = [...new Set(webSources)].slice(0, 4);
   }
   return result;
 }
@@ -259,6 +270,49 @@ const CONSOLE_LABELS: Record<string, string> = {
   switch: 'Nintendo Switch',
   switch2: 'Nintendo Switch 2',
 };
+
+const CONSOLE_OFFICIAL_DOMAINS: Record<string, string[]> = {
+  ps5: ['playstation.com'],
+  ps5_pro: ['playstation.com'],
+  xbox_series_x: ['xbox.com'],
+  xbox_series_s: ['xbox.com'],
+  switch: ['nintendo.com'],
+  switch2: ['nintendo.com'],
+};
+
+const HARDWARE_OFFICIAL_DOMAINS: Array<{ pattern: RegExp; domains: string[] }> = [
+  { pattern: /elgato/i, domains: ['elgato.com'] },
+  { pattern: /avermedia|live gamer/i, domains: ['avermedia.com'] },
+  { pattern: /razer|ripsaw/i, domains: ['razer.com'] },
+  { pattern: /ugreen/i, domains: ['ugreen.com'] },
+  { pattern: /magewell/i, domains: ['magewell.com'] },
+  { pattern: /blackmagic/i, domains: ['blackmagicdesign.com'] },
+  { pattern: /atomos/i, domains: ['atomos.com'] },
+  { pattern: /corsair/i, domains: ['corsair.com'] },
+  { pattern: /\blg\b/i, domains: ['lg.com'] },
+  { pattern: /samsung/i, domains: ['samsung.com'] },
+  { pattern: /asus/i, domains: ['asus.com'] },
+  { pattern: /acer/i, domains: ['acer.com'] },
+  { pattern: /dell|alienware/i, domains: ['dell.com'] },
+  { pattern: /benq/i, domains: ['benq.com'] },
+  { pattern: /\bmsi\b/i, domains: ['msi.com'] },
+];
+
+function cleanDetectedHardwareName(value: string | undefined): string {
+  return (value ?? '')
+    .replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getOfficialDomains(value: string | undefined): string[] {
+  const match = HARDWARE_OFFICIAL_DOMAINS.find(({ pattern }) => pattern.test(value ?? ''));
+  return match?.domains ?? [];
+}
+
+function isKnownHardwareName(value: string): boolean {
+  return value.length > 2 && !/^(unknown|desconocido|display|monitor|default)/i.test(value);
+}
 
 const CONSOLE_PROFILE_JSON_SHAPE = `Responde SOLO con JSON valido y exactamente con esta forma:
 {
@@ -273,7 +327,9 @@ const CONSOLE_PROFILE_JSON_SHAPE = `Responde SOLO con JSON valido y exactamente 
     "sources": ["https://..."]
   },
   "recommendations": {
+    "canvas_resolution": "3840x2160",
     "resolution": "1920x1080",
+    "recording_resolution": "3840x2160",
     "fps": 60,
     "encoder": "nvenc",
     "bitrate": 6000,
@@ -287,7 +343,11 @@ const CONSOLE_PROFILE_JSON_SHAPE = `Responde SOLO con JSON valido y exactamente 
 const CONSOLE_PROFILE_RULES = `Reglas:
 - La capturadora suele ser el cuello de botella: distingue su resolucion/fps de CAPTURA (lo que graba OBS) de su PASSTHROUGH (lo que pasa al monitor). Muchas baratas pasan 4K pero capturan 1080p30/60.
 - "captureResolution"/"captureFps" = lo maximo que conviene capturar = el MENOR techo entre consola y capturadora.
-- "recommendations" son los ajustes de OBS en la PC: usa el hardware de la PC para "encoder"/"bitrate", pero limita "resolution"/"fps" al techo de captura. Nunca superes lo que la capturadora puede capturar.
+- "canvas_resolution" es el lienzo base de OBS y debe preservar la resolucion nativa de captura cuando el hardware pueda procesarla.
+- "resolution" es EXCLUSIVAMENTE la salida del stream. Ajustala a la plataforma; en Twitch normalmente 1920x1080 aunque se capture y grabe en 4K.
+- "recording_resolution" es la resolucion del archivo grabado. Si el modo incluye grabacion y la capturadora entrega 4K60, conserva 3840x2160 cuando el hardware de la PC pueda codificarlo.
+- En modo "stream_record", lienzo/grabacion y stream pueden ser distintos: por ejemplo 3840x2160 para lienzo y grabacion, 1920x1080 para Twitch.
+- "recommendations" son los ajustes de OBS en la PC: usa el hardware de la PC para "encoder"/"bitrate" y nunca superes el techo real de la capturadora.
 - "consoleSettings": pasos concretos para ajustar la salida de video de la consola (resolucion, fps, HDR/RGB) de forma compatible con la capturadora.
 - Si no identificas un componente, marca "identified": false y usa valores conservadores.
 - En cada filtro/campo se honesto sobre limitaciones reales del hardware.`;
@@ -314,16 +374,35 @@ export async function getConsoleProfileFromGroq(request: ConsoleProfileRequest):
 
   // Intento 1: Tavily (sin tier especial, funciona en tier gratuito)
   if (process.env.TAVILY_API_KEY) {
+    const consoleName = CONSOLE_LABELS[request.console] ?? request.console;
+    const captureName = cleanDetectedHardwareName(request.captureCard);
+    const monitorName = cleanDetectedHardwareName(request.monitor);
     const searchQueries = [
-      `${CONSOLE_LABELS[request.console] ?? request.console} specifications`,
-      `${request.captureCard} capture card specifications`,
+      {
+        query: `"${consoleName}" technical specifications resolution fps`,
+        domains: CONSOLE_OFFICIAL_DOMAINS[request.console] ?? [],
+      },
+      {
+        query: `"${captureName}" technical specifications capture resolution fps`,
+        domains: getOfficialDomains(captureName),
+      },
+      ...(isKnownHardwareName(monitorName) ? [{
+        query: `"${monitorName}" technical specifications resolution refresh rate HDR`,
+        domains: getOfficialDomains(monitorName),
+      }] : []),
     ];
 
-    for (const query of searchQueries) {
-      const { results, sources } = await searchWeb(query);
+    const searches = await Promise.all(searchQueries.map(async ({ query, domains }) => ({
+      query,
+      ...await searchWeb(query, domains),
+    })));
+
+    for (const { query, results, sources } of searches) {
       if (results.length > 0) {
         webContext += `\n${query}:\n${results.join('\n')}\n`;
-        webSources = [...webSources, ...sources];
+        // Reserva espacio para ambas piezas de la cadena; evita que cuatro
+        // resultados de la consola oculten todas las fuentes de la capturadora.
+        webSources = [...webSources, ...sources.slice(0, 2)];
       }
     }
 
@@ -333,7 +412,7 @@ export async function getConsoleProfileFromGroq(request: ConsoleProfileRequest):
   }
 
   // Intento 2: GROQ_SEARCH_MODEL como fallback
-  if (!webContext && process.env.GROQ_SEARCH_MODEL) {
+  if (!webContext && getAIProvider() === 'groq' && process.env.GROQ_SEARCH_MODEL) {
     try {
       const webPrompt = `Eres un experto en streaming de consolas con OBS. Busca en la web las especificaciones OFICIALES de la consola, la capturadora y el monitor indicados, y haz "match" de la cadena consola -> capturadora -> monitor.
 ${buildConsoleContext(request)}
@@ -343,7 +422,7 @@ ${CONSOLE_PROFILE_RULES}
 
 ${CONSOLE_PROFILE_JSON_SHAPE}`;
 
-      const response = await chat(
+      const response = await chatWithAI(
         [
           { role: 'system', content: 'Eres un experto en streaming de consolas con OBS. Usas busqueda web para confirmar specs y respondes solo en JSON valido.' },
           { role: 'user', content: webPrompt },
@@ -364,7 +443,7 @@ ${webContext ? `- Usa esta informacion navegada para confirmar specs:\n${webCont
 
 ${CONSOLE_PROFILE_JSON_SHAPE}`;
 
-  const response = await chat(
+  const response = await chatWithAI(
     [
       { role: 'system', content: 'Eres un experto en streaming de consolas con OBS. Respondes solo en JSON valido.' },
       { role: 'user', content: knowledgePrompt },
@@ -374,8 +453,8 @@ ${CONSOLE_PROFILE_JSON_SHAPE}`;
 
   const result = parseJsonObject(response) as any;
   // Si navegamos via Tavily, agregar las sources encontradas
-  if (webSources.length > 0 && result.profile) {
-    result.profile.sources = [...(result.profile.sources ?? []), ...webSources].slice(0, 3);
+  if (result.profile) {
+    result.profile.sources = [...new Set(webSources)].slice(0, 6);
   }
   return result;
 }
@@ -389,12 +468,14 @@ Contexto:
 - Modo: ${mode}
 - Plataforma: ${platform}
 - CPU: ${systemInfo.cpu.model} (${systemInfo.cpu.cores} cores)
-- GPU: ${systemInfo.gpu.model} ${systemInfo.gpu.vram}MB VRAM (Vendor: ${systemInfo.gpu.vendor})
+- GPU: ${systemInfo.gpu.model} ${formatGpuMemory(systemInfo)} (Vendor: ${systemInfo.gpu.vendor})
 - RAM: ${systemInfo.ram.total}GB
 - Hardware NVENC disponible: ${systemInfo.gpu.hasNvenc ? 'Si' : 'No'}
 
 Configuracion original:
-- Resolucion: ${originalRecommendations.resolution}
+- Lienzo base: ${originalRecommendations.canvas_resolution}
+- Resolucion del stream: ${originalRecommendations.resolution}
+- Resolucion de grabacion: ${originalRecommendations.recording_resolution}
 - FPS: ${originalRecommendations.fps}
 - Encoder: ${originalRecommendations.encoder}
 - Bitrate de video: ${originalRecommendations.bitrate} kbps
@@ -403,7 +484,9 @@ Configuracion original:
 - Calidad de grabacion: ${originalRecommendations.recording_quality}
 
 Configuracion actual modificada:
-- Resolucion: ${currentRecommendations.resolution}
+- Lienzo base: ${currentRecommendations.canvas_resolution}
+- Resolucion del stream: ${currentRecommendations.resolution}
+- Resolucion de grabacion: ${currentRecommendations.recording_resolution}
 - FPS: ${currentRecommendations.fps}
 - Encoder: ${currentRecommendations.encoder}
 - Bitrate de video: ${currentRecommendations.bitrate} kbps
@@ -418,7 +501,7 @@ Responde en JSON con este formato exacto, sin texto adicional:
   "reasoning": "Explicacion breve en espanol: menciona calidad esperada, estabilidad probable, carga de CPU/GPU/red y cualquier riesgo concreto del cambio."
 }`;
 
-  const response = await chat([
+  const response = await chatWithAI([
     { role: 'system', content: 'Eres un experto en configuracion de OBS. Responde solo en JSON valido.' },
     { role: 'user', content: prompt },
   ]);

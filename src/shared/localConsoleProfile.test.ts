@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getLocalConsoleProfile } from './localConsoleProfile';
+import { getLocalConsoleProfile, normalizeConsoleProfileForRequest, resolveConsoleProfileResponse } from './localConsoleProfile';
 import type { ConsoleProfileRequest, SystemInfo } from './types';
 
 const systemInfo: SystemInfo = {
@@ -59,5 +59,87 @@ describe('getLocalConsoleProfile', () => {
     const result = getLocalConsoleProfile(makeRequest({ console: 'ps5', captureCard: 'Elgato 4K60 capture' }));
     expect(result.profile.captureResolution).toBe('3840x2160');
     expect(result.profile.captureFps).toBe(60);
+    expect(result.recommendations.canvas_resolution).toBe('3840x2160');
+    expect(result.recommendations.resolution).toBe('1920x1080');
+    expect(result.recommendations.recording_resolution).toBe('3840x2160');
+  });
+
+  it('prioriza capacidades verificadas y encoder Apple sobre una respuesta incorrecta de IA', () => {
+    const appleSystem: SystemInfo = {
+      cpu: { model: 'Apple M4', cores: 10 },
+      gpu: { model: 'Apple M4', vendor: 'Apple', hasNvenc: false },
+      ram: { total: 16 },
+      os: { platform: 'darwin', distro: 'macOS', release: '15' },
+    };
+    const request = makeRequest({
+      console: 'ps5_pro',
+      systemInfo: appleSystem,
+      captureMaxResolution: '3840x2160',
+      captureMaxFps: 60,
+    });
+    const aiResponse = getLocalConsoleProfile(request);
+    aiResponse.source = 'ai';
+    aiResponse.profile.captureResolution = '1920x1080';
+    aiResponse.recommendations = {
+      ...aiResponse.recommendations,
+      canvas_resolution: '1920x1080',
+      recording_resolution: '1920x1080',
+      encoder: 'nvenc',
+    };
+    aiResponse.reasoning = 'Usa NVENC y considera el monitor como limite de captura.';
+
+    const result = normalizeConsoleProfileForRequest(request, aiResponse);
+
+    expect(result.profile.captureResolution).toBe('3840x2160');
+    expect(result.recommendations).toMatchObject({
+      canvas_resolution: '3840x2160',
+      resolution: '1920x1080',
+      recording_resolution: '3840x2160',
+      fps: 60,
+      encoder: 'apple vt h264',
+    });
+    expect(result.reasoning).toContain('encoder apple vt h264');
+    expect(result.reasoning).not.toContain('NVENC');
+    expect(result.profile.bottleneck).toContain('capturadora fija el techo');
+  });
+
+  it('completa recomendaciones omitidas por un modelo local sin descartar su perfil', () => {
+    const request = makeRequest({
+      console: 'ps5_pro',
+      captureMaxResolution: '3840x2160',
+      captureMaxFps: 60,
+    });
+    const payload = {
+      profile: {
+        console: { name: 'PlayStation 5 Pro', identified: true, summary: 'Analizada por IA.' },
+        captureCard: { name: 'Elgato 4K X', identified: true, summary: 'Analizada por IA.' },
+        monitor: { name: 'Monitor', identified: false, summary: '' },
+        bottleneck: 'Sin cuello de botella a 4K60.',
+        captureResolution: '3840x2160',
+        captureFps: 60,
+        consoleSettings: ['Usar 4K60.'],
+        sources: [],
+      },
+    };
+
+    const result = resolveConsoleProfileResponse(request, payload);
+
+    expect(result.source).toBe('ai');
+    expect(result.profile.bottleneck).toContain('OBS verifico');
+    expect(result.reasoning).toContain('Configuracion final');
+    expect(result.reasoning).not.toContain('IA no estuvo disponible');
+    expect(result.recommendations).toMatchObject({
+      canvas_resolution: '3840x2160',
+      resolution: '1920x1080',
+      recording_resolution: '3840x2160',
+      encoder: 'nvenc',
+    });
+  });
+
+  it('usa respaldo local completo cuando la IA no devuelve ningun perfil', () => {
+    const result = resolveConsoleProfileResponse(makeRequest(), { reasoning: 'sin perfil' });
+
+    expect(result.source).toBe('local');
+    expect(result.recommendations.resolution).toBe('1920x1080');
   });
 });

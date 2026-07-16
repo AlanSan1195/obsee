@@ -1,4 +1,4 @@
-const baseUrl = (process.env.OBSREC_AI_API_URL || 'http://localhost:3000').replace(/\/+$/, '');
+const baseUrl = (process.env.OBSREC_AI_API_URL || 'http://localhost:5173').replace(/\/+$/, '');
 const shouldTestAI = process.argv.includes('--ai');
 
 async function post(pathname, body) {
@@ -81,6 +81,6 @@ try {
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`Backend smoke test failed: ${message}`);
-  console.error('Set OBSREC_AI_API_URL to a deployed Vercel URL or run vercel dev locally.');
+  console.error('Run pnpm dev locally or set OBSREC_AI_API_URL to another backend URL.');
   process.exitCode = 1;
 }

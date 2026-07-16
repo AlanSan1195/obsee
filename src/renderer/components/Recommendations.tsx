@@ -8,7 +8,9 @@ import { IconAlert, IconSliders, Section, Spinner } from './ui';
 type RecommendationSettings = AIRecommendationSettings;
 
 const recommendationFields: AIRecommendationField[] = [
+  'canvas_resolution',
   'resolution',
+  'recording_resolution',
   'fps',
   'encoder',
   'bitrate',
@@ -168,7 +170,9 @@ function getChangedFields(
 
 function isUsableRecommendation(settings: RecommendationSettings): boolean {
   return Boolean(
-    /^\d{3,4}x\d{3,4}$/.test(settings.resolution)
+    /^\d{3,4}x\d{3,4}$/.test(settings.canvas_resolution)
+    && /^\d{3,4}x\d{3,4}$/.test(settings.resolution)
+    && /^\d{3,4}x\d{3,4}$/.test(settings.recording_resolution)
     && settings.fps > 0
     && settings.bitrate > 0
     && settings.audio_bitrate > 0
@@ -255,18 +259,22 @@ export function Recommendations() {
     platform,
     recommendation?.originalRecommendations?.audio_bitrate,
     recommendation?.originalRecommendations?.bitrate,
+    recommendation?.originalRecommendations?.canvas_resolution,
     recommendation?.originalRecommendations?.encoder,
     recommendation?.originalRecommendations?.fps,
     recommendation?.originalRecommendations?.recording_format,
     recommendation?.originalRecommendations?.recording_quality,
+    recommendation?.originalRecommendations?.recording_resolution,
     recommendation?.originalRecommendations?.resolution,
     recommendation?.originalReasoning,
     recommendation?.recommendations.audio_bitrate,
     recommendation?.recommendations.bitrate,
+    recommendation?.recommendations.canvas_resolution,
     recommendation?.recommendations.encoder,
     recommendation?.recommendations.fps,
     recommendation?.recommendations.recording_format,
     recommendation?.recommendations.recording_quality,
+    recommendation?.recommendations.recording_resolution,
     recommendation?.recommendations.resolution,
     setRecommendation,
     systemInfo,
@@ -318,11 +326,25 @@ export function Recommendations() {
         <span>Privacidad: solo se envia informacion tecnica del equipo, modo y plataforma; no se envian archivos ni claves de OBS.</span>
       </div>
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field label="Resolucion">
+        <Field label="Lienzo base">
+          <SelectField
+            value={recommendations.canvas_resolution}
+            options={resolutionOptions}
+            onChange={(canvas_resolution) => updateRecommendations({ canvas_resolution })}
+          />
+        </Field>
+        <Field label="Stream">
           <SelectField
             value={recommendations.resolution}
             options={resolutionOptions}
             onChange={(resolution) => updateRecommendations({ resolution })}
+          />
+        </Field>
+        <Field label="Grabacion">
+          <SelectField
+            value={recommendations.recording_resolution}
+            options={resolutionOptions}
+            onChange={(recording_resolution) => updateRecommendations({ recording_resolution })}
           />
         </Field>
         <Field label="FPS">
@@ -339,7 +361,7 @@ export function Recommendations() {
             onChange={(encoder) => updateRecommendations({ encoder })}
           />
         </Field>
-        <Field label="Bitrate de video">
+        <Field label="Bitrate del stream">
           <NumberField
             value={recommendations.bitrate}
             min={500}
@@ -356,7 +378,7 @@ export function Recommendations() {
             onChange={(audio_bitrate) => updateRecommendations({ audio_bitrate })}
           />
         </Field>
-        <Field label="Grabacion">
+        <Field label="Formato y calidad">
           <div className="grid grid-cols-2 gap-3">
             <SelectField
               value={recommendations.recording_format}

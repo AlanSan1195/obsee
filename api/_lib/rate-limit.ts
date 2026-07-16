@@ -1,4 +1,5 @@
 import type { ApiRequest } from './http';
+import { getAIProvider } from './ai-provider';
 import { getClientIp, getHeader } from './http';
 
 const dailyLimit = Number(process.env.OBSREC_AI_DAILY_LIMIT ?? 20);
@@ -64,6 +65,10 @@ async function increment(key: string, ttlSeconds: number): Promise<number> {
 }
 
 export async function checkRateLimit(request: ApiRequest): Promise<RateLimitResult> {
+  if (getAIProvider() === 'ollama') {
+    return { allowed: true, remaining: Number.MAX_SAFE_INTEGER };
+  }
+
   const installId = getHeader(request, 'x-obsrec-install-id').trim() || 'missing-install-id';
   const ip = getClientIp(request);
   const ttlSeconds = secondsUntilTomorrow();

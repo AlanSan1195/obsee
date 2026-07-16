@@ -78,16 +78,66 @@ describe('getLocalRecommendation', () => {
   });
 
   it('baja a 720p30 en CPU o RAM limitada', () => {
-    const cpuLimited = getLocalRecommendation(makeRequest({ systemInfo: { cpu: { cores: 4 } } })).recommendations;
+    const cpuLimited = getLocalRecommendation(makeRequest({
+      systemInfo: {
+        cpu: { cores: 4 },
+        gpu: { model: 'Unknown', vendor: 'Unknown', hasNvenc: false },
+      },
+    })).recommendations;
     const ramLimited = getLocalRecommendation(makeRequest({ systemInfo: { ram: { total: 8 } } })).recommendations;
     const youtubeLimited = getLocalRecommendation(makeRequest({
       platform: 'youtube',
-      systemInfo: { cpu: { cores: 4 } },
+      systemInfo: {
+        cpu: { cores: 4 },
+        gpu: { model: 'Unknown', vendor: 'Unknown', hasNvenc: false },
+      },
     })).recommendations;
 
     expect(cpuLimited).toMatchObject({ resolution: '1280x720', fps: 30, bitrate: 3500 });
     expect(ramLimited).toMatchObject({ resolution: '1280x720', fps: 30, bitrate: 3500 });
     expect(youtubeLimited).toMatchObject({ resolution: '1280x720', fps: 30, bitrate: 4500 });
+  });
+
+  it.each([
+    ['Apple', 'Apple M4', false, 'apple vt h264'],
+    ['NVIDIA', 'NVIDIA RTX', true, 'nvenc'],
+    ['Intel', 'Intel Arc', false, 'qsv'],
+    ['AMD', 'AMD Radeon', false, 'amd'],
+  ])('mantiene 1080p60 con encoder de hardware %s aunque el CPU tenga 6 nucleos', (vendor, model, hasNvenc, encoder) => {
+    const result = getLocalRecommendation(makeRequest({
+      systemInfo: {
+        cpu: { cores: 6 },
+        gpu: { vendor, model, hasNvenc },
+      },
+    })).recommendations;
+
+    expect(result).toMatchObject({ resolution: '1920x1080', fps: 60, encoder });
+  });
+
+  it('mantiene el umbral de CPU para x264 y el de RAM para cualquier encoder', () => {
+    const x264Limited = getLocalRecommendation(makeRequest({
+      systemInfo: {
+        cpu: { cores: 6 },
+        gpu: { model: 'Unknown', vendor: 'Unknown', hasNvenc: false },
+      },
+    })).recommendations;
+    const x264Capable = getLocalRecommendation(makeRequest({
+      systemInfo: {
+        cpu: { cores: 8 },
+        gpu: { model: 'Unknown', vendor: 'Unknown', hasNvenc: false },
+      },
+    })).recommendations;
+    const appleRamLimited = getLocalRecommendation(makeRequest({
+      systemInfo: {
+        cpu: { cores: 10 },
+        gpu: { model: 'Apple M4', vendor: 'Apple', hasNvenc: false },
+        ram: { total: 8 },
+      },
+    })).recommendations;
+
+    expect(x264Limited).toMatchObject({ resolution: '1280x720', fps: 30, encoder: 'x264' });
+    expect(x264Capable).toMatchObject({ resolution: '1920x1080', fps: 60, encoder: 'x264' });
+    expect(appleRamLimited).toMatchObject({ resolution: '1280x720', fps: 30, encoder: 'apple vt h264' });
   });
 
   it('elige encoder por proveedor de GPU', () => {
@@ -129,9 +179,9 @@ describe('getLocalRecommendation', () => {
     expect(result.fps).toBe(60);
   });
 
-  it('usa calidad alta solo para modo de grabacion', () => {
+  it('usa calidad alta cuando el modo incluye grabacion', () => {
     expect(getLocalRecommendation(makeRequest({ mode: 'record_only' })).recommendations.recording_quality).toBe('high');
-    expect(getLocalRecommendation(makeRequest({ mode: 'stream_record' })).recommendations.recording_quality).toBe('stream');
+    expect(getLocalRecommendation(makeRequest({ mode: 'stream_record' })).recommendations.recording_quality).toBe('high');
     expect(getLocalRecommendation(makeRequest({ mode: 'stream_only' })).recommendations.recording_quality).toBe('stream');
   });
 });
@@ -154,7 +204,7 @@ describe('getLocalRecommendationExplanation', () => {
     const explanation = getLocalRecommendationExplanation(explanationRequest);
 
     expect(explanation.source).toBe('local');
-    expect(explanation.reasoning).toContain('resolucion: 1920X1080 -> 2560X1440');
+    expect(explanation.reasoning).toContain('resolucion del stream: 1920X1080 -> 2560X1440');
     expect(explanation.reasoning).toContain('bitrate de video: 9000 -> 8000');
     expect(explanation.reasoning).toContain('carga de video sube');
   });

@@ -58,6 +58,9 @@ export function ConsoleReport() {
   if (!consoleProfile) return null;
 
   const { profile } = consoleProfile;
+  const sourceCount = profile.sources?.length ?? 0;
+  const researchStatus = profile.research?.status
+    ?? (sourceCount > 0 ? 'verified' : 'unavailable');
 
   return (
     <Section
@@ -84,6 +87,25 @@ export function ConsoleReport() {
         <span>Captura recomendada: <strong>{profile.captureResolution}</strong> a <strong>{profile.captureFps}fps</strong></span>
       </div>
 
+      <div className={`mt-3 flex items-start gap-2 rounded-none border px-4 py-3 text-sm ${researchStatus === 'verified'
+        ? 'border-secondary/35 bg-secondary/10 text-secondary'
+        : 'border-warning/35 bg-warning/[0.06] text-warning'}`}
+      >
+        {researchStatus === 'verified'
+          ? <IconCheck className="mt-0.5 h-4 w-4 shrink-0" />
+          : <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />}
+        <div>
+          <span className="block font-semibold">Investigacion de hardware</span>
+          <span className="mt-0.5 block opacity-90">
+            {researchStatus === 'verified'
+              ? `Especificaciones contrastadas con ${sourceCount} fuente${sourceCount === 1 ? '' : 's'} web mediante ${profile.research?.provider === 'ai_search' ? 'busqueda IA' : 'Tavily'}.`
+              : researchStatus === 'no_results'
+                ? 'La busqueda web se ejecuto, pero no encontro fuentes suficientemente relevantes. Se usaron las capacidades leidas por OBS y el perfil local.'
+                : 'La busqueda web no estuvo configurada para este analisis. Se usaron las capacidades leidas por OBS y el perfil local.'}
+          </span>
+        </div>
+      </div>
+
       {profile.consoleSettings.length > 0 && (
         <div className="mt-4 rounded-none border border-border bg-surface/45 p-4">
           <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-text-muted">Ajustes en la consola</span>
@@ -97,7 +119,7 @@ export function ConsoleReport() {
 
       {profile.sources && profile.sources.length > 0 && (
         <p className="mt-3 text-xs text-text-faint">
-          Segun fabricante:{' '}
+          Fuentes consultadas:{' '}
           {profile.sources.map((url, index) => (
             <React.Fragment key={url}>
               {index > 0 && ' · '}

@@ -38,7 +38,7 @@ export function inferObsUsage(snapshot: OBSSettingsSnapshot): InferredObsUsage {
 // contexto a la recomendacion.
 export function extractObsBaseline(snapshot: OBSSettingsSnapshot): ObsBaselineSettings {
   return {
-    resolution: snapshot.outputResolution,
+    resolution: snapshot.streamResolution ?? snapshot.outputResolution,
     fps: snapshot.fps,
     encoder: snapshot.encoder,
     bitrate: snapshot.bitrate,

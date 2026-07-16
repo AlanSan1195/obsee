@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { detectHardwareHints, loadHardwareOverrides, saveHardwareOverrides } from '../lib/system-info';
 import { Section } from './ui';
 
@@ -16,21 +16,39 @@ export function HardwareForm() {
   const hints = useMemo(() => detectHardwareHints(), []);
   const initial = useMemo(() => loadHardwareOverrides(), []);
   const [cpuModel, setCpuModel] = useState(initial.cpuModel ?? hints.cpuModelHint ?? '');
-  const [ramGb, setRamGb] = useState(String(initial.ramGb ?? hints.ramGbHint ?? ''));
+  const [cpuCores, setCpuCores] = useState(String(initial.cpuCores ?? ''));
+  const [ramGb, setRamGb] = useState(String(initial.ramGb ?? ''));
 
-  useEffect(() => {
-    const ram = Number(ramGb);
+  const persistHardware = (next: { cpuModel: string; cpuCores: string; ramGb: string }) => {
+    const cores = Number(next.cpuCores);
+    const ram = Number(next.ramGb);
     saveHardwareOverrides({
-      cpuModel: cpuModel.trim() || undefined,
+      cpuModel: next.cpuModel.trim() || undefined,
+      cpuCores: Number.isInteger(cores) && cores >= 1 && cores <= 256 ? cores : undefined,
       ramGb: Number.isFinite(ram) && ram > 0 ? ram : undefined,
     });
-  }, [cpuModel, ramGb]);
+  };
+
+  const handleCpuModelChange = (value: string) => {
+    setCpuModel(value);
+    persistHardware({ cpuModel: value, cpuCores, ramGb });
+  };
+
+  const handleCpuCoresChange = (value: string) => {
+    setCpuCores(value);
+    persistHardware({ cpuModel, cpuCores: value, ramGb });
+  };
+
+  const handleRamChange = (value: string) => {
+    setRamGb(value);
+    persistHardware({ cpuModel, cpuCores, ramGb: value });
+  };
 
   return (
     <Section
       title="hardware.config"
       icon={<span className="text-xs">[hw]</span>}
-      subtitle="El navegador detecta tu GPU automaticamente. Completa el CPU y la RAM para que la recomendacion sea precisa."
+      subtitle="El navegador estima la GPU. Confirma el CPU, sus nucleos y la RAM para que la recomendacion sea precisa."
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border border-border bg-white/[0.03] px-4 py-3 text-xs lowercase tracking-terminal">
@@ -43,11 +61,11 @@ export function HardwareForm() {
             <span className="text-text">{hints.gpu.vendor.toLowerCase()}</span>
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="text-text-faint">hilos cpu</span>
-            <span className="text-text">{hints.cores}</span>
+            <span className="text-text-faint">procesadores logicos (estimacion)</span>
+            <span className="text-text">{hints.logicalProcessors ?? 'no disponible'}</span>
           </span>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px]">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px_140px]">
           <label className="block">
             <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-text-muted">
               Modelo de CPU
@@ -55,7 +73,7 @@ export function HardwareForm() {
             <input
               type="text"
               value={cpuModel}
-              onChange={(event) => setCpuModel(event.target.value)}
+              onChange={(event) => handleCpuModelChange(event.target.value)}
               placeholder="Ej: AMD Ryzen 5 5600X, Intel Core i5-12400, Apple M4"
               spellCheck={false}
               className="w-full rounded-none border border-border bg-white/[0.03] px-4 py-3 text-sm text-text outline-none transition-colors focus:border-primary/60"
@@ -68,11 +86,29 @@ export function HardwareForm() {
           </label>
           <label className="block">
             <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-text-muted">
+              Nucleos CPU
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={256}
+              step={1}
+              value={cpuCores}
+              onChange={(event) => handleCpuCoresChange(event.target.value)}
+              placeholder="Ej: 10"
+              className="w-full rounded-none border border-border bg-white/[0.03] px-4 py-3 text-sm text-text outline-none transition-colors focus:border-primary/60"
+            />
+            <span className="mt-2 block text-xs text-text-faint">
+              Confirma el total real; el navegador puede mostrar menos.
+            </span>
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-text-muted">
               RAM (GB)
             </span>
             <select
               value={ramGb}
-              onChange={(event) => setRamGb(event.target.value)}
+              onChange={(event) => handleRamChange(event.target.value)}
               className="w-full rounded-none border border-border bg-background px-4 py-3 text-sm text-text outline-none transition-colors focus:border-primary/60"
             >
               <option value="">elige...</option>
@@ -82,6 +118,11 @@ export function HardwareForm() {
                 </option>
               ))}
             </select>
+            {hints.ramGbHint && (
+              <span className="mt-2 block text-xs text-text-faint">
+                El navegador reporta hasta {hints.ramGbHint} GB; confirma el valor real.
+              </span>
+            )}
           </label>
         </div>
       </div>

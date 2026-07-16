@@ -78,10 +78,14 @@ se puede detectar, y cómo lo usa obsee:
 | Dato | API | Fiabilidad |
 |---|---|---|
 | GPU | WebGL `WEBGL_debug_renderer_info` | Buena (viene "envuelta", ver abajo) |
-| Hilos de CPU | `navigator.hardwareConcurrency` | Exacta |
+| Procesadores lógicos disponibles para el navegador | `navigator.hardwareConcurrency` | Estimación; puede ser menor al hardware real |
 | RAM | `navigator.deviceMemory` | Solo Chrome, **tope en 8** |
 | Capturadoras | `mediaDevices.enumerateDevices()` | Buena, requiere permiso |
 | Modelo de CPU | — no existe API — | Formulario manual |
+
+`navigator.hardwareConcurrency` no es un inventario físico. El navegador puede
+reducir el valor por límites internos o privacidad, así que obsee sólo lo muestra
+como pista y pide confirmar el número real de núcleos antes del análisis.
 
 ### GPU: el string ANGLE
 
@@ -107,9 +111,11 @@ cpuModelHint: gpu.vendor === 'Apple' && /Apple M\d/i.test(gpu.model)
 
 `navigator.deviceMemory` existe solo en Chrome y **satura en 8** por
 privacidad (evita fingerprinting): una máquina con 16, 32 o 64 GB reporta 8.
-Para recomendar bitrates de stream ese dato es inútil — por eso la RAM se
-pide en un `<select>` con valores reales de mercado y se persiste en
-`localStorage['obsrec-hardware']`.
+Para recomendar bitrates de stream ese dato es inútil — por eso sólo se muestra
+como pista. La RAM se pide en un `<select>` con valores reales de mercado y se
+persiste únicamente después de que el usuario la confirma. El registro usa una
+versión de esquema para no reutilizar como confirmados valores guardados por
+versiones anteriores.
 
 ### Capturadoras: el baile de permisos de `enumerateDevices`
 

@@ -290,6 +290,11 @@ export const appAPI = {
           profile: {
             ...localProfile.profile,
             sources: webSources.length > 0 ? webSources : localProfile.profile.sources,
+            research: {
+              status: webSources.length > 0 ? 'verified' as const : 'no_results' as const,
+              provider: 'tavily' as const,
+              sourceCount: webSources.length,
+            },
           },
           reasoning: `${localProfile.reasoning}${webSources.length > 0 ? ' [Fuentes navegadas via Tavily]' : ' IA integrada no disponible: ' + getRemoteAIUserMessage(error)}`,
         };

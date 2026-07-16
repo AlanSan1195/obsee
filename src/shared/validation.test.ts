@@ -43,6 +43,9 @@ const validOBSConfig = {
   mode: 'stream_record',
   platform: 'twitch',
   resolution: '1920x1080',
+  canvasResolution: '3840x2160',
+  streamResolution: '1920x1080',
+  recordingResolution: '3840x2160',
   fps: 59.6,
   encoder: ' NVENC H264 ',
   bitrate: 5999.6,
@@ -104,6 +107,40 @@ const validSystemInfo = {
   },
 };
 
+describe('validateSystemInfo through recommendation requests', () => {
+  it('acepta frecuencia de CPU y VRAM desconocidas', () => {
+    const systemInfo = {
+      ...validSystemInfo,
+      cpu: { model: 'Apple M4', cores: 10 },
+      gpu: { model: 'Apple M4', vendor: 'Apple', hasNvenc: false },
+    };
+
+    const result = validateAIRecommendationRequest({
+      systemInfo,
+      mode: 'stream_record',
+      platform: 'twitch',
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.value.systemInfo.cpu.speed).toBeUndefined();
+    expect(result.value.systemInfo.gpu.vram).toBeUndefined();
+  });
+
+  it('rechaza mediciones opcionales invalidas', () => {
+    expect(validateAIRecommendationRequest({
+      systemInfo: { ...validSystemInfo, cpu: { ...validSystemInfo.cpu, speed: -1 } },
+      mode: 'stream_record',
+      platform: 'twitch',
+    }).success).toBe(false);
+    expect(validateAIRecommendationRequest({
+      systemInfo: { ...validSystemInfo, gpu: { ...validSystemInfo.gpu, vram: -1 } },
+      mode: 'stream_record',
+      platform: 'twitch',
+    }).success).toBe(false);
+  });
+});
+
 describe('parseResolution', () => {
   it('acepta resoluciones con formato ancho x alto', () => {
     expect(parseResolution('1920x1080')).toEqual({
@@ -163,6 +200,9 @@ describe('validateOBSConfig', () => {
         mode: 'stream_record',
         platform: 'twitch',
         resolution: '1920x1080',
+        canvasResolution: '3840x2160',
+        streamResolution: '1920x1080',
+        recordingResolution: '3840x2160',
         fps: 60,
         encoder: 'nvenc h264',
         bitrate: 6000,
@@ -247,7 +287,9 @@ describe('validateAIRecommendation', () => {
       success: true,
       value: {
         recommendations: {
+          canvas_resolution: '1920x1080',
           resolution: '1920x1080',
+          recording_resolution: '1920x1080',
           fps: 60,
           encoder: 'nvenc',
           bitrate: 6000,
@@ -272,7 +314,9 @@ describe('validateAIRecommendation', () => {
       success: true,
       value: {
         recommendations: {
+          canvas_resolution: '1920x1080',
           resolution: '1920x1080',
+          recording_resolution: '1920x1080',
           fps: 60,
           encoder: 'nvenc',
           bitrate: 6000,
@@ -305,8 +349,11 @@ describe('validateAIRecommendationExplanationRequest', () => {
         systemInfo: validSystemInfo,
         mode: 'stream_record',
         platform: 'youtube',
+        currentSettings: undefined,
         originalRecommendations: {
+          canvas_resolution: '1920x1080',
           resolution: '1920x1080',
+          recording_resolution: '1920x1080',
           fps: 60,
           encoder: 'nvenc',
           bitrate: 6000,
@@ -315,7 +362,9 @@ describe('validateAIRecommendationExplanationRequest', () => {
           recording_quality: 'high',
         },
         currentRecommendations: {
+          canvas_resolution: '2560x1440',
           resolution: '2560x1440',
+          recording_resolution: '2560x1440',
           fps: 60,
           encoder: 'nvenc',
           bitrate: 12000,
@@ -345,7 +394,7 @@ describe('validateAIRecommendationExplanationRequest', () => {
 
 describe('validateOBSBackup', () => {
   it('acepta respaldos validos', () => {
-    expect(validateOBSBackup(validBackup)).toEqual({
+    expect(validateOBSBackup(validBackup)).toMatchObject({
       success: true,
       value: validBackup,
     });
@@ -639,7 +688,8 @@ describe('validateConsoleProfileResponse', () => {
       captureResolution: '1920x1080',
       captureFps: 30,
       consoleSettings: ['paso 1', 'paso 2'],
-      sources: ['https://www.playstation.com'],
+      sources: ['https://www.playstation.com', 'https://...'],
+      research: { status: 'verified', provider: 'tavily', sourceCount: 1 },
     },
     recommendations: {
       resolution: '1920x1080', fps: 30, encoder: 'nvenc', bitrate: 6000, audio_bitrate: 320, recording_format: 'mkv', recording_quality: 'high',
@@ -652,6 +702,8 @@ describe('validateConsoleProfileResponse', () => {
     expect(result.success).toBe(true);
     if (!result.success) return;
     expect(result.value.profile.captureResolution).toBe('1920x1080');
+    expect(result.value.profile.sources).toEqual(['https://www.playstation.com']);
+    expect(result.value.profile.research).toEqual({ status: 'verified', provider: 'tavily', sourceCount: 1 });
     expect(result.value.recommendations.fps).toBe(30);
   });
 

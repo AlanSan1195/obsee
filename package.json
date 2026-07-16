@@ -3,10 +3,12 @@
   "version": "1.1.1",
   "description": "OBS Auto Configuration Tool for Streamers",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --mode ollama",
+    "dev:ollama": "vite --mode ollama",
+    "dev:remote": "vite --mode development",
     "build": "vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:api": "tsc --noEmit --target ES2022 --module CommonJS --moduleResolution node --esModuleInterop --skipLibCheck --strict api/health.ts api/recommendation.ts api/explanation.ts api/audio-profile.ts api/console-profile.ts api/web-search.ts api/_lib/groq.ts api/_lib/http.ts api/_lib/rate-limit.ts",
+    "typecheck:api": "tsc --noEmit --target ES2022 --module CommonJS --moduleResolution node --esModuleInterop --skipLibCheck --strict api/health.ts api/recommendation.ts api/explanation.ts api/audio-profile.ts api/console-profile.ts api/web-search.ts api/_lib/ai-provider.ts api/_lib/groq.ts api/_lib/http.ts api/_lib/rate-limit.ts",
     "test:ai-backend": "node scripts/test-ai-backend.mjs",
     "lint": "eslint src",
     "test": "vitest run"

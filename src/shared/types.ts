@@ -98,7 +98,13 @@ export interface OBSAudioConfig {
 export interface OBSConfig {
   mode: OBSMode;
   platform: OBSPlatform;
+  // `resolution` se conserva como alias de la salida de stream para clientes
+  // anteriores. Los tres campos explicitos permiten grabar y transmitir a
+  // resoluciones distintas sin confundir el lienzo de OBS.
   resolution: string;
+  canvasResolution?: string;
+  streamResolution?: string;
+  recordingResolution?: string;
   fps: number;
   encoder: string;
   bitrate: number;
@@ -157,6 +163,18 @@ export interface OBSSettingsSnapshot {
   streamServer: string;
   baseResolution: string;
   outputResolution: string;
+  streamResolution?: string;
+  recordingResolution?: string;
+  outputMode?: 'Simple' | 'Advanced';
+  advancedOutput?: {
+    streamEncoder: string;
+    recordingEncoder: string;
+    streamRescaleResolution: string;
+    recordingRescaleResolution: string;
+    streamRescaleFilter: string;
+    recordingRescaleFilter: string;
+    recordingFormat: string;
+  };
   fps: number;
   encoder: string;
   bitrate: number;
@@ -176,11 +194,11 @@ export interface SystemInfo {
   cpu: {
     model: string;
     cores: number;
-    speed: number;
+    speed?: number;
   };
   gpu: {
     model: string;
-    vram: number;
+    vram?: number;
     vendor: string;
     hasNvenc: boolean;
   };
@@ -214,7 +232,11 @@ export interface AIRecommendationRequest {
 }
 
 export type AIRecommendationSettings = {
+  canvas_resolution: string;
+  // Resolucion que recibe la plataforma de streaming. `resolution` mantiene
+  // compatibilidad con el contrato anterior de la API.
   resolution: string;
+  recording_resolution: string;
   fps: number;
   encoder: string;
   bitrate: number;
@@ -310,6 +332,11 @@ export interface ConsoleProfile {
   captureFps: number;
   consoleSettings: string[];
   sources?: string[];
+  research?: {
+    status: 'verified' | 'no_results' | 'unavailable';
+    provider?: 'tavily' | 'ai_search';
+    sourceCount: number;
+  };
 }
 
 export interface ConsoleProfileResponse {

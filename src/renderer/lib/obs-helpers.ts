@@ -56,6 +56,20 @@ export function getSimpleEncoderId(encoder: string): string | null {
   return null;
 }
 
+export function getAdvancedEncoderId(encoder: string): string | null {
+  const normalized = encoder.toLowerCase();
+
+  if (normalized.includes('nvenc') || normalized.includes('nvidia')) return 'ffmpeg_nvenc';
+  if (normalized.includes('x264')) return 'obs_x264';
+  if (normalized.includes('qsv') || normalized.includes('quick sync')) return 'obs_qsv11';
+  if (normalized.includes('amf') || normalized.includes('amd')) return 'h264_texture_amf';
+  if (normalized.includes('apple') || normalized.includes('videotoolbox')) {
+    return 'com.apple.videotoolbox.videoencoder.ave.avc';
+  }
+
+  return null;
+}
+
 export function getSimpleRecordingQuality(quality?: string): string {
   switch (quality?.toLowerCase()) {
     case 'lossless':

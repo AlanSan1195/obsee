@@ -62,11 +62,16 @@ export function buildComparisonRows(
     {
       label: 'Lienzo base',
       current: snapshot.baseResolution,
-      recommended: recommendations.resolution,
+      recommended: recommendations.canvas_resolution,
     },
     {
-      label: 'Resolucion de salida',
+      label: 'Salida maestra / grabacion',
       current: snapshot.outputResolution,
+      recommended: recommendations.recording_resolution,
+    },
+    {
+      label: 'Salida del stream',
+      current: snapshot.streamResolution ?? snapshot.outputResolution,
       recommended: recommendations.resolution,
     },
     {
@@ -81,7 +86,7 @@ export function buildComparisonRows(
       type: 'encoder',
     },
     {
-      label: 'Bitrate de video',
+      label: 'Bitrate del stream',
       current: String(snapshot.bitrate),
       recommended: String(recommendations.bitrate),
     },

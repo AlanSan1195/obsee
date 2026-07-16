@@ -21,19 +21,23 @@ OBS ya trae un asistente de auto-configuración, pero funciona como caja negra: 
 
 ```bash
 pnpm install
-pnpm dev          # abre http://localhost:5173 (proxy /api hacia producción)
+ollama pull gpt-oss:20b
+pnpm dev          # abre http://localhost:5173 con IA local de Ollama
 pnpm test         # suite de Vitest
 pnpm typecheck && pnpm lint
 pnpm build        # build de producción en dist/
 ```
 
-Las claves (`GROQ_API_KEY`, `TAVILY_API_KEY`, rate limits) viven **solo** en las variables de entorno de Vercel — el frontend no contiene secretos.
+Ollama debe estar ejecutándose en `http://127.0.0.1:11434`. `pnpm dev` usa `.env.ollama`, atiende las funciones `/api` dentro de Vite y no consume Groq ni el límite diario de producción. Si `gpt-oss:20b` resulta demasiado pesado para tu equipo, cambia `OLLAMA_MODEL` en `.env.ollama` por un modelo local más pequeño que siga instrucciones JSON. Para contrastar consolas, capturadoras y micrófonos con fuentes web reales durante estas pruebas, configura `TAVILY_API_KEY` en `.env.ollama.local`; la clave permanece en el proceso local de Vite y nunca se expone al navegador.
+
+Para probar deliberadamente contra la API desplegada usa `pnpm run dev:remote`; ese comando sí consume la cuota real. Las claves (`GROQ_API_KEY`, `TAVILY_API_KEY`, rate limits) viven **solo** en las variables de entorno de Vercel — el frontend no contiene secretos.
 
 ## Arquitectura y decisiones
 
 ```text
 navegador ──ws://localhost:4455──> OBS Studio        (control directo, nunca sale de tu PC)
 navegador ──HTTPS──> funciones serverless en Vercel  (IA: Groq + búsqueda web Tavily)
+navegador ──HTTP local──> Vite ──> Ollama             (desarrollo sin cuota externa)
 ```
 
 Stack: React 19 + Vite + TypeScript + Tailwind + Zustand; `obs-websocket-js` en el navegador; funciones serverless en Vercel (`api/`) con Groq y Tavily.
@@ -48,8 +52,9 @@ api/                endpoints serverless de IA (Vercel)
 Decisiones vigentes:
 
 - **La conexión con OBS es 100% local.** El navegador habla con el servidor WebSocket de OBS en tu misma máquina. Tu password de OBS, tus escenas y tu configuración nunca pasan por internet; a la IA solo viajan specs anónimas de hardware (CPU, GPU, RAM, SO).
-- **Detección de hardware híbrida**: GPU vía WebGL, capturadoras HDMI vía permisos de cámara; CPU y RAM se piden en un formulario (el navegador no puede leerlos con fiabilidad) y persisten en `localStorage`.
+- **Detección de hardware híbrida**: la GPU se estima vía WebGL y el navegador aporta pistas limitadas de CPU/RAM; el usuario confirma modelo, núcleos y RAM en un formulario versionado en `localStorage` porque esas APIs no son un inventario fiable.
 - **Nunca sin respuesta**: si la IA no está disponible (sin red, límite diario), un motor de recomendación local genera la configuración.
+- **IA local durante desarrollo**: Vite ejecuta los mismos handlers de `api/` contra Ollama; Groq solo se usa en producción o con `pnpm run dev:remote`.
 - **Respaldo antes de tocar**: la configuración actual de OBS se guarda en `localStorage` y se puede restaurar desde la pestaña de comparación.
 - **Flujo guiado en 4 pasos**: conectar → ajustes (hardware, modo, plataforma) → detección (recomendación + audio) → escenas (con vista previa en vivo).
 - **Perfilado de consolas** (PS5/Xbox/Switch): detecta tu capturadora, lee sus capacidades reales desde OBS y recomienda la cadena de captura completa.

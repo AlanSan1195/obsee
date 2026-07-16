@@ -6,7 +6,10 @@ import { checkRateLimit } from './_lib/rate-limit';
 const trustedDomains = [
   // Oficiales y manuales
   'support.', 'manual.', 'manuals.', 'specs.', 'specifications.',
+  'playstation.com', 'xbox.com', 'nintendo.com', 'sony.com',
   'ugreen.', 'elgato.', 'avermedia.', 'razer.', 'cam-link.',
+  'magewell.', 'blackmagicdesign.', 'atomos.', 'corsair.', 'nzxt.',
+  'lg.com', 'samsung.com', 'asus.com', 'acer.com', 'dell.com', 'benq.com', 'msi.com',
   // Retailers grandes
   'amazon.', 'mercadolibre.', 'aliexpress.', 'newegg.', 'bhphotovideo.',
   'adorama.', 'b&h.', 'sweetwater.', 'bestbuy.', 'walmart.',
@@ -15,8 +18,14 @@ const trustedDomains = [
 ];
 
 function isUrlTrusted(url: string): boolean {
-  const domain = new URL(url).hostname.toLowerCase();
-  return trustedDomains.some((trusted) => domain.includes(trusted));
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol) || url.includes('...')) return false;
+    const domain = parsed.hostname.toLowerCase();
+    return trustedDomains.some((trusted) => domain.includes(trusted));
+  } catch {
+    return false;
+  }
 }
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {

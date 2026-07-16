@@ -7,7 +7,9 @@ type ValidationResult<T> =
 const modes: OBSMode[] = ['stream_record', 'stream_only', 'record_only'];
 const platforms: OBSPlatform[] = ['twitch', 'youtube'];
 const recommendationFields: AIRecommendationField[] = [
+  'canvas_resolution',
   'resolution',
+  'recording_resolution',
   'fps',
   'encoder',
   'bitrate',
@@ -41,6 +43,16 @@ function isPositiveNumber(value: unknown): value is number {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isValidSourceUrl(value: unknown): value is string {
+  if (!isNonEmptyString(value) || value.includes('...')) return false;
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) && url.hostname.length > 3;
+  } catch {
+    return false;
+  }
 }
 
 export function parseResolution(value: string): ValidationResult<{ width: number; height: number }> {
@@ -185,6 +197,21 @@ export function validateOBSConfig(value: unknown): ValidationResult<OBSConfig> {
     return resolution;
   }
 
+  const canvasResolutionValue = isNonEmptyString(value.canvasResolution)
+    ? value.canvasResolution
+    : value.resolution;
+  const streamResolutionValue = isNonEmptyString(value.streamResolution)
+    ? value.streamResolution
+    : value.resolution;
+  const recordingResolutionValue = isNonEmptyString(value.recordingResolution)
+    ? value.recordingResolution
+    : value.resolution;
+
+  for (const candidate of [canvasResolutionValue, streamResolutionValue, recordingResolutionValue]) {
+    const parsed = parseResolution(candidate);
+    if (!parsed.success) return parsed;
+  }
+
   if (!isPositiveNumber(value.fps) || value.fps > 240) {
     return { success: false, message: 'FPS must be a number between 1 and 240.' };
   }
@@ -219,7 +246,10 @@ export function validateOBSConfig(value: unknown): ValidationResult<OBSConfig> {
     value: {
       mode: value.mode as OBSMode,
       platform: value.platform as OBSPlatform,
-      resolution: value.resolution.trim(),
+      resolution: streamResolutionValue.trim(),
+      canvasResolution: canvasResolutionValue.trim(),
+      streamResolution: streamResolutionValue.trim(),
+      recordingResolution: recordingResolutionValue.trim(),
       fps: Math.round(value.fps),
       encoder: value.encoder.trim().toLowerCase(),
       bitrate: Math.round(value.bitrate),
@@ -264,11 +294,16 @@ export function validateSystemInfo(value: unknown): ValidationResult<SystemInfo>
     return { success: false, message: 'System info is incomplete.' };
   }
 
-  if (!isNonEmptyString(value.cpu.model) || !isPositiveNumber(value.cpu.cores) || !isPositiveNumber(value.cpu.speed)) {
+  if (!isNonEmptyString(value.cpu.model)
+    || !isPositiveNumber(value.cpu.cores)
+    || (value.cpu.speed !== undefined && !isPositiveNumber(value.cpu.speed))) {
     return { success: false, message: 'CPU info is incomplete.' };
   }
 
-  if (!isNonEmptyString(value.gpu.model) || typeof value.gpu.vram !== 'number' || !isNonEmptyString(value.gpu.vendor) || typeof value.gpu.hasNvenc !== 'boolean') {
+  if (!isNonEmptyString(value.gpu.model)
+    || (value.gpu.vram !== undefined && (!isFiniteNumber(value.gpu.vram) || value.gpu.vram < 0))
+    || !isNonEmptyString(value.gpu.vendor)
+    || typeof value.gpu.hasNvenc !== 'boolean') {
     return { success: false, message: 'GPU info is incomplete.' };
   }
 
@@ -286,11 +321,11 @@ export function validateSystemInfo(value: unknown): ValidationResult<SystemInfo>
       cpu: {
         model: value.cpu.model,
         cores: value.cpu.cores,
-        speed: value.cpu.speed,
+        ...(value.cpu.speed !== undefined ? { speed: value.cpu.speed } : {}),
       },
       gpu: {
         model: value.gpu.model,
-        vram: value.gpu.vram,
+        ...(value.gpu.vram !== undefined ? { vram: value.gpu.vram } : {}),
         vendor: value.gpu.vendor,
         hasNvenc: value.gpu.hasNvenc,
       },
@@ -434,6 +469,20 @@ export function validateAIRecommendation(value: unknown): ValidationResult<Omit<
     return resolution;
   }
 
+  // Backward compatible: respuestas de proveedores anteriores solo incluian
+  // `resolution`. En ese caso se usa para lienzo y grabacion tambien.
+  const canvasResolution = isNonEmptyString(recommendation.canvas_resolution)
+    ? recommendation.canvas_resolution
+    : recommendation.resolution;
+  const recordingResolution = isNonEmptyString(recommendation.recording_resolution)
+    ? recommendation.recording_resolution
+    : recommendation.resolution;
+
+  for (const candidate of [canvasResolution, recordingResolution]) {
+    const parsed = parseResolution(candidate);
+    if (!parsed.success) return parsed;
+  }
+
   if (!isPositiveNumber(recommendation.fps) || recommendation.fps > 240) {
     return { success: false, message: 'AI recommendation has invalid FPS.' };
   }
@@ -458,7 +507,9 @@ export function validateAIRecommendation(value: unknown): ValidationResult<Omit<
     success: true,
     value: {
       recommendations: {
+        canvas_resolution: canvasResolution.trim(),
         resolution: recommendation.resolution.trim(),
+        recording_resolution: recordingResolution.trim(),
         fps: Math.round(recommendation.fps),
         encoder: recommendation.encoder.trim().toLowerCase(),
         bitrate: Math.round(recommendation.bitrate),
@@ -501,6 +552,22 @@ export function validateOBSBackup(value: unknown): ValidationResult<OBSBackup> {
     streamServer: snapshot.streamServer.trim(),
     baseResolution: snapshot.baseResolution.trim(),
     outputResolution: snapshot.outputResolution.trim(),
+    streamResolution: isNonEmptyString(snapshot.streamResolution) && parseResolution(snapshot.streamResolution).success
+      ? snapshot.streamResolution.trim()
+      : snapshot.outputResolution.trim(),
+    recordingResolution: isNonEmptyString(snapshot.recordingResolution) && parseResolution(snapshot.recordingResolution).success
+      ? snapshot.recordingResolution.trim()
+      : snapshot.outputResolution.trim(),
+    outputMode: snapshot.outputMode === 'Advanced' ? 'Advanced' : 'Simple',
+    advancedOutput: isRecord(snapshot.advancedOutput) ? {
+      streamEncoder: isNonEmptyString(snapshot.advancedOutput.streamEncoder) ? snapshot.advancedOutput.streamEncoder.trim() : '',
+      recordingEncoder: isNonEmptyString(snapshot.advancedOutput.recordingEncoder) ? snapshot.advancedOutput.recordingEncoder.trim() : '',
+      streamRescaleResolution: isNonEmptyString(snapshot.advancedOutput.streamRescaleResolution) ? snapshot.advancedOutput.streamRescaleResolution.trim() : snapshot.outputResolution.trim(),
+      recordingRescaleResolution: isNonEmptyString(snapshot.advancedOutput.recordingRescaleResolution) ? snapshot.advancedOutput.recordingRescaleResolution.trim() : snapshot.outputResolution.trim(),
+      streamRescaleFilter: isNonEmptyString(snapshot.advancedOutput.streamRescaleFilter) ? snapshot.advancedOutput.streamRescaleFilter.trim() : '0',
+      recordingRescaleFilter: isNonEmptyString(snapshot.advancedOutput.recordingRescaleFilter) ? snapshot.advancedOutput.recordingRescaleFilter.trim() : '0',
+      recordingFormat: isNonEmptyString(snapshot.advancedOutput.recordingFormat) ? snapshot.advancedOutput.recordingFormat.trim() : '',
+    } : undefined,
     fps: Math.round(snapshot.fps),
     encoder: snapshot.encoder.trim(),
     bitrate: Math.round(snapshot.bitrate),
@@ -701,7 +768,7 @@ export function validateMicProfileResponse(value: unknown): ValidationResult<Mic
         hasBuiltinDsp: profileRaw.hasBuiltinDsp === true,
         summary: asReason(profileRaw.summary),
         sources: Array.isArray(profileRaw.sources)
-          ? profileRaw.sources.filter(isNonEmptyString).map((url) => url.trim()).slice(0, 6)
+          ? profileRaw.sources.filter(isValidSourceUrl).map((url) => url.trim()).slice(0, 6)
           : undefined,
       },
       filters: {
@@ -801,6 +868,12 @@ export function validateConsoleProfileResponse(value: unknown): ValidationResult
   }
 
   const p = value.profile;
+  const research = isRecord(p.research) ? p.research : undefined;
+  const researchStatus = research?.status === 'verified'
+    || research?.status === 'no_results'
+    || research?.status === 'unavailable'
+    ? research.status
+    : undefined;
   return {
     success: true,
     value: {
@@ -819,8 +892,19 @@ export function validateConsoleProfileResponse(value: unknown): ValidationResult
           ? p.consoleSettings.filter(isNonEmptyString).map((s) => s.trim().replace(/^\d+[.)]\s*/, '').slice(0, 200)).slice(0, 8)
           : [],
         sources: Array.isArray(p.sources)
-          ? p.sources.filter(isNonEmptyString).map((s) => s.trim()).slice(0, 6)
+          ? p.sources.filter(isValidSourceUrl).map((s) => s.trim()).slice(0, 6)
           : undefined,
+        ...(researchStatus ? {
+          research: {
+            status: researchStatus,
+            provider: research?.provider === 'tavily' || research?.provider === 'ai_search'
+              ? research.provider
+              : undefined,
+            sourceCount: isFiniteNumber(research?.sourceCount)
+              ? Math.max(0, Math.round(research.sourceCount))
+              : 0,
+          },
+        } : {}),
       },
       recommendations: rec.value.recommendations,
       reasoning: isNonEmptyString(value.reasoning) ? value.reasoning.trim() : 'Sin explicacion.',

@@ -81,11 +81,18 @@ export function normalizeConsoleProfileForRequest(
       ? `OBS verifico que la capturadora fija el techo de captura en ${verifiedCaptureResolution} a ${verifiedCaptureFps}fps. El monitor solo afecta el passthrough y no reduce la grabacion de OBS.`
       : `OBS verifico captura hasta ${verifiedCaptureResolution} a ${verifiedCaptureFps}fps sin un limite inferior al de la consola. El monitor solo afecta el passthrough.`
     : response.profile.bottleneck;
-  const sourceCount = response.profile.sources?.length ?? 0;
-  const evidence = sourceCount > 0
-    ? `Se contrastaron ${sourceCount} fuentes web y luego se priorizaron las capacidades reales leidas por OBS.`
-    : 'No hubo fuentes web verificadas; se priorizaron las capacidades reales leidas por OBS y el hardware confirmado.';
-  const reasoning = `${evidence} Configuracion final: lienzo ${verifiedCaptureResolution}; stream ${streamResolution} con ${preferredEncoder} a ${response.recommendations.bitrate}kbps; grabacion ${recordingResolution} con ${preferredRecordingEncoder} a ${recordingBitrate}kbps; ${Math.min(response.recommendations.fps, verifiedCaptureFps)}fps.`;
+  const finalFps = Math.min(response.recommendations.fps, verifiedCaptureFps);
+  const captureMatch = hasVerifiedCaptureCaps
+    ? `La **${consoleInfo.name}** y la capturadora hacen match en **${verifiedCaptureResolution} a ${verifiedCaptureFps} FPS**, capacidad comprobada directamente por OBS.`
+    : `La **${consoleInfo.name}** y la capturadora se ajustaron al techo seguro de **${verifiedCaptureResolution} a ${verifiedCaptureFps} FPS**.`;
+  const streamMatch = request.mode === 'record_only'
+    ? ''
+    : `El **stream ${streamResolution} a ${response.recommendations.bitrate} kbps** adapta esa señal a ${request.platform} para priorizar una emision estable.`;
+  const recordingMatch = wantsRecording
+    ? `La **grabacion ${recordingResolution} con ${preferredRecordingEncoder.toUpperCase()} a ${recordingBitrate} kbps** conserva mas detalle en el archivo local sin atarla al limite del stream.`
+    : '';
+  const encoderMatch = `El **encoder ${preferredEncoder.toUpperCase()}** aprovecha ${request.systemInfo.gpu.model}; los **${finalFps} FPS** mantienen fluido el movimiento.`;
+  const reasoning = [captureMatch, streamMatch, recordingMatch, encoderMatch].filter(Boolean).join(' ');
   const monitorIsKnown = isKnownMonitorName(request.monitor ?? '');
 
   return {
@@ -122,7 +129,7 @@ export function normalizeConsoleProfileForRequest(
       canvas_resolution: verifiedCaptureResolution,
       resolution: streamResolution,
       recording_resolution: recordingResolution,
-      fps: Math.min(response.recommendations.fps, verifiedCaptureFps),
+      fps: finalFps,
       encoder: preferredEncoder,
       recording_encoder: preferredRecordingEncoder,
       recording_bitrate: recordingBitrate,

@@ -1,11 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store';
-import { getLocalRecommendationExplanation } from '../../shared/localRecommendation';
+import { getLocalRecommendationExplanation, isRecommendationExplanationConsistent } from '../../shared/localRecommendation';
 import { appAPI } from '../lib/app-api';
 import type { AIRecommendation, AIRecommendationField, AIRecommendationSettings } from '../../shared/types';
+import { InlineEmphasis } from './InlineEmphasis';
 import { IconAlert, IconSliders, Section, Spinner } from './ui';
 
 type RecommendationSettings = AIRecommendationSettings;
+
+interface ExplanationConcept {
+  label: string;
+  value: string;
+  description: string;
+  fields: AIRecommendationField[];
+}
 
 const recommendationFields: AIRecommendationField[] = [
   'canvas_resolution',
@@ -26,6 +34,61 @@ const encoderOptions = ['apple vt h264', 'apple vt hevc', 'nvenc', 'x264', 'qsv'
 const audioBitrateOptions = [160, 192, 256, 320];
 const recordingFormatOptions = ['mkv', 'mp4', 'mov'];
 const recordingQualityOptions = ['stream', 'medium', 'high', 'lossless'];
+
+function getExplanationConcepts(
+  settings: RecommendationSettings,
+  mode: string | null,
+  platform: string | null,
+): ExplanationConcept[] {
+  const platformLabel = platform === 'youtube' ? 'YouTube' : 'Twitch';
+  const concepts: ExplanationConcept[] = [
+    {
+      label: 'Lienzo base',
+      value: settings.canvas_resolution,
+      description: 'Es el area de trabajo de OBS. Define cuanto detalle pueden conservar las fuentes antes de crear cada salida.',
+      fields: ['canvas_resolution'],
+    },
+  ];
+
+  if (mode !== 'record_only') {
+    concepts.push({
+      label: `Stream en ${platformLabel}`,
+      value: `${settings.resolution} · ${settings.bitrate} kbps`,
+      description: 'Es lo que recibe la audiencia. Resolucion y bitrate equilibran nitidez con estabilidad de red.',
+      fields: ['resolution', 'bitrate'],
+    });
+  }
+
+  if (mode !== 'stream_only') {
+    concepts.push({
+      label: 'Grabacion local',
+      value: `${settings.recording_resolution} · ${settings.recording_bitrate} kbps`,
+      description: 'Es el archivo guardado en tu equipo. Puede conservar mas calidad porque no depende del limite del stream.',
+      fields: ['recording_resolution', 'recording_bitrate', 'recording_format', 'recording_quality'],
+    });
+  }
+
+  concepts.push(
+    {
+      label: 'Fluidez',
+      value: `${settings.fps} FPS`,
+      description: 'Son las imagenes por segundo. Mas FPS suavizan el movimiento, pero tambien exigen mas al hardware.',
+      fields: ['fps'],
+    },
+    {
+      label: 'Encoder',
+      value: mode === 'stream_only'
+        ? settings.encoder.toUpperCase()
+        : `Stream: ${settings.encoder.toUpperCase()} · Grabacion: ${settings.recording_encoder.toUpperCase()}`,
+      description: settings.encoder.toLowerCase().includes('x264')
+        ? 'X264 comprime el stream con el CPU: puede dar buena calidad, pero deja menos margen para otras tareas pesadas.'
+        : 'Comprime el stream con hardware de video, reduce la carga del CPU y ayuda a evitar cuadros perdidos.',
+      fields: ['encoder', 'recording_encoder'],
+    },
+  );
+
+  return concepts;
+}
 
 function Field({
   label,
@@ -238,8 +301,11 @@ export function Recommendations() {
     };
 
     const timeoutId = window.setTimeout(async () => {
-      const explanation = await appAPI.ai.explainRecommendation(request)
+      const remoteExplanation = await appAPI.ai.explainRecommendation(request)
         .catch(() => getLocalRecommendationExplanation(request));
+      const explanation = isRecommendationExplanationConsistent(request, remoteExplanation.reasoning)
+        ? remoteExplanation
+        : getLocalRecommendationExplanation(request);
 
       if (explanationRequestIdRef.current !== requestId) return;
 
@@ -304,6 +370,8 @@ export function Recommendations() {
   const { recommendations, reasoning } = recommendation;
   const originalRecommendations = recommendation.originalRecommendations ?? recommendations;
   const changedFields = getChangedFields(originalRecommendations, recommendations);
+  const changedFieldSet = new Set(changedFields);
+  const explanationConcepts = getExplanationConcepts(recommendations, mode, platform);
   const hasUserChanges = changedFields.length > 0;
   const updateRecommendations = (patch: Partial<RecommendationSettings>) => {
     const baselineRecommendations = recommendation.originalRecommendations ?? recommendation.recommendations;
@@ -418,24 +486,54 @@ export function Recommendations() {
           </div>
         </Field>
       </div>
-      <div className="rounded-none border border-primary/30 bg-primary/[0.06] p-4">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="block text-xs font-semibold uppercase tracking-wider text-primary">
-            Por que esta configuracion?
-          </span>
-          {hasUserChanges && (
+      {hasUserChanges && (
+        <div className="rounded-none border border-primary/30 bg-primary/[0.06] p-4 sm:p-5">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="block text-xs font-semibold uppercase tracking-wider text-primary">
+              Resultado de tu cambio
+            </span>
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
               {isExplaining && <Spinner className="h-3 w-3" />}
               {isExplaining
                 ? 'IA recalculando'
                 : explanationSource === 'local'
-                  ? 'Analisis actualizado'
+                  ? 'Analisis verificado'
                   : 'IA integrada actualizada'}
             </span>
-          )}
+          </div>
+          <p aria-live="polite" className="text-sm leading-relaxed text-text">
+            <InlineEmphasis text={reasoning} />
+          </p>
+
+          <div className="mt-4 grid grid-cols-1 gap-px overflow-hidden border border-border/70 bg-border/70 sm:grid-cols-2">
+            {explanationConcepts.map((concept) => {
+              const changed = concept.fields.some((field) => changedFieldSet.has(field));
+
+              return (
+                <div
+                  key={concept.label}
+                  className={`relative bg-background/80 p-3.5 transition-colors ${changed ? 'bg-warning/[0.08]' : ''}`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className={`text-[11px] font-semibold uppercase tracking-wider ${changed ? 'text-warning' : 'text-text-muted'}`}>
+                      {concept.label}
+                    </span>
+                    {changed && (
+                      <span className="border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-warning">
+                        Ajuste cambiado
+                      </span>
+                    )}
+                  </div>
+                  <strong className={`mt-1.5 block text-sm font-semibold ${changed ? 'text-warning' : 'text-text'}`}>
+                    {concept.value}
+                  </strong>
+                  <p className="mt-1.5 text-xs leading-relaxed text-text-muted">{concept.description}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <p className="text-sm leading-relaxed text-text">{reasoning}</p>
-      </div>
+      )}
     </Section>
   );
 }

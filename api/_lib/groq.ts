@@ -137,6 +137,8 @@ Campos de resolucion:
 - "recording_encoder" y "recording_bitrate" pertenecen exclusivamente al archivo local. No reutilices el bitrate limitado del stream para grabar.
 - En Apple Silicon, prefiere Apple VT H264 para el stream y Apple VT HEVC para grabacion local. Como referencia, 4K60 HEVC puede usar 40000 kbps; 4K60 H264 requiere aproximadamente 60000 kbps.
 
+La explicacion debe tener un maximo de 90 palabras y lenguaje sencillo. Explica el match entre el hardware detectado y los ajustes, el resultado que obtiene el usuario y por que se separan stream y grabacion cuando aplique. Define cada termino dentro de su consecuencia practica: lienzo = area de trabajo, stream = lo que ve la audiencia, grabacion = archivo local, FPS = fluidez y encoder = quien comprime el video. Resalta los nombres y valores importantes con **doble asterisco**. No menciones el proceso interno, las fuentes ni que eres una IA.
+
 Responde en JSON con este formato exacto, sin texto adicional:
 {
   "recommendations": {
@@ -152,7 +154,7 @@ Responde en JSON con este formato exacto, sin texto adicional:
     "recording_format": "mkv",
     "recording_quality": "high"
   },
-  "reasoning": "Explicacion de por que esta configuracion es optima para este hardware"
+  "reasoning": "Explicacion breve del match entre hardware y configuracion"
 }`;
 
   const response = await chatWithAI([
@@ -508,6 +510,9 @@ Configuracion actual modificada:
 - Calidad de grabacion: ${currentRecommendations.recording_quality}
 
 Campos modificados: ${changedFields.join(', ')}
+
+Escribe un maximo de 90 palabras. Empieza indicando que ajuste cambio, de que valor a cual, y resalta con **doble asterisco** el nombre del ajuste y sus valores. Despues explica el resultado concreto: calidad visible, fluidez, estabilidad, carga de CPU/GPU, consumo de red o tamano de archivo segun corresponda. Compara contra la recomendacion original y termina con un riesgo o beneficio claro. No repitas toda la configuracion ni menciones que eres una IA.
+Reglas tecnicas obligatorias: x264 codifica con el CPU y aumenta su carga frente a un encoder por hardware. NVENC, Apple VT, QSV y AMD usan hardware dedicado y normalmente reducen la carga del CPU. Nunca afirmes lo contrario. Cambiar el encoder del stream no cambia directamente la calidad de la grabacion si esta usa su propio recording_encoder.
 
 Responde en JSON con este formato exacto, sin texto adicional:
 {

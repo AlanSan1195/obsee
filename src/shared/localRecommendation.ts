@@ -106,10 +106,22 @@ export function getLocalRecommendation(request: AIRecommendationRequest): AIReco
     : getPreferredRecordingEncoder(request.systemInfo);
   const videoProfile = getVideoProfile(request, encoder);
   const recordingQuality = request.mode === 'stream_only' ? 'stream' : 'high';
+  const recordingBitrate = request.mode === 'stream_only'
+    ? videoProfile.bitrate
+    : getRecordingBitrate(videoProfile.resolution, videoProfile.fps, recordingEncoder);
 
-  const reasoning = videoProfile.usedBaseline
-    ? 'Recomendacion local basada en la configuracion que OBS ya tenia (definida en su asistente inicial segun tu hardware y red), ajustando el encoder al optimo de tu equipo (la IA no estuvo disponible).'
-    : 'Recomendacion local generada a partir de los nucleos de CPU, la RAM, el proveedor de GPU, la plataforma y el modo seleccionados (la IA no estuvo disponible).';
+  const hardwareMatch = encoder === 'x264'
+    ? `El **encoder ${encoder.toUpperCase()}** usa los ${request.systemInfo.cpu.cores} nucleos del CPU porque no se detecto un encoder de video dedicado.`
+    : `El **encoder ${encoder.toUpperCase()}** hace match con la GPU ${request.systemInfo.gpu.model} y codifica por hardware para quitarle carga al CPU.`;
+  const baselineMatch = videoProfile.usedBaseline
+    ? 'Se conservo la base que OBS ya habia ajustado para tu equipo y tu red.'
+    : 'La resolucion y los FPS se limitaron a un nivel seguro para el hardware detectado.';
+  const outputMatch = request.mode === 'stream_only'
+    ? `El **stream ${videoProfile.resolution} a ${videoProfile.fps} FPS y ${videoProfile.bitrate} kbps** equilibra nitidez, movimiento y estabilidad en ${request.platform}.`
+    : request.mode === 'record_only'
+      ? `La **grabacion ${videoProfile.resolution} a ${videoProfile.fps} FPS y ${recordingBitrate} kbps** conserva detalle y fluidez en el archivo local.`
+      : `El **stream ${videoProfile.resolution} a ${videoProfile.bitrate} kbps** prioriza estabilidad en ${request.platform}; la **grabacion ${videoProfile.resolution} a ${recordingBitrate} kbps** conserva mas calidad en el archivo local.`;
+  const reasoning = `${hardwareMatch} ${baselineMatch} ${outputMatch}`;
 
   return {
     source: 'local',
@@ -121,9 +133,7 @@ export function getLocalRecommendation(request: AIRecommendationRequest): AIReco
       encoder,
       bitrate: videoProfile.bitrate,
       recording_encoder: recordingEncoder,
-      recording_bitrate: request.mode === 'stream_only'
-        ? videoProfile.bitrate
-        : getRecordingBitrate(videoProfile.resolution, videoProfile.fps, recordingEncoder),
+      recording_bitrate: recordingBitrate,
       audio_bitrate: 320,
       recording_format: 'mkv',
       recording_quality: recordingQuality,
@@ -215,8 +225,8 @@ function getEncoderGuidance(settings: AIRecommendationSettings, request: AIRecom
 export function getLocalRecommendationExplanation(request: AIRecommendationExplanationRequest): AIRecommendationExplanation {
   const { currentRecommendations, originalRecommendations, changedFields } = request;
   const changedText = changedFields
-    .map((field) => `${fieldLabels[field]}: ${String(originalRecommendations[field]).toUpperCase()} -> ${String(currentRecommendations[field]).toUpperCase()}`)
-    .join(', ');
+    .map((field) => `Cambiaste **${fieldLabels[field]}** de **${String(originalRecommendations[field]).toUpperCase()}** a **${String(currentRecommendations[field]).toUpperCase()}**`)
+    .join('. ');
   const originalWorkload = getWorkload(originalRecommendations);
   const currentWorkload = getWorkload(currentRecommendations);
   const workloadRatio = originalWorkload > 0 ? currentWorkload / originalWorkload : 1;
@@ -230,4 +240,28 @@ export function getLocalRecommendationExplanation(request: AIRecommendationExpla
     source: 'local',
     reasoning: `${changedText}. ${workloadText} ${getBitrateGuidance(currentRecommendations, request.platform)} ${getEncoderGuidance(currentRecommendations, request)}`,
   };
+}
+
+function isSoftwareEncoder(value: string): boolean {
+  return value.toLowerCase().includes('x264');
+}
+
+export function isRecommendationExplanationConsistent(
+  request: AIRecommendationExplanationRequest,
+  reasoning: string,
+): boolean {
+  if (!request.changedFields.includes('encoder')) return true;
+
+  const originalUsesCpu = isSoftwareEncoder(request.originalRecommendations.encoder);
+  const currentUsesCpu = isSoftwareEncoder(request.currentRecommendations.encoder);
+  if (originalUsesCpu === currentUsesCpu) return true;
+
+  const normalized = reasoning.toLowerCase();
+  const decreaseClaim = /(?:baja(?:ra)?|disminu(?:ye|ira)|reduc(?:e|ira)|menor)/;
+  const increaseClaim = /(?:sube|subira|aumenta(?:ra)?|incrementa(?:ra)?|mayor)/;
+  const cpuLoad = /(?:carga|uso|consumo)(?:\s+del?|\s+de la)?\s+cpu/;
+  const saysCpuLoadDecreases = new RegExp(`${cpuLoad.source}.{0,35}${decreaseClaim.source}|${decreaseClaim.source}.{0,35}${cpuLoad.source}`).test(normalized);
+  const saysCpuLoadIncreases = new RegExp(`${cpuLoad.source}.{0,35}${increaseClaim.source}|${increaseClaim.source}.{0,35}${cpuLoad.source}`).test(normalized);
+
+  return currentUsesCpu ? !saysCpuLoadDecreases : !saysCpuLoadIncreases;
 }

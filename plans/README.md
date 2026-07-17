@@ -17,7 +17,7 @@ unless a reviewing advisor maintains the index.
 | 004 | Preserve unknown CPU speed and GPU memory honestly | P1 | M | 003 | DONE |
 | 005 | Make the local video ceiling encoder-aware | P2 | M | 004 | DONE |
 | 006 | Keep local credentials private and untrackable | P1 | S | — | BLOCKED — two isolated executors stalled before tracked edits; local `.env` mode is already 0600 |
-| 007 | Remove all high-severity dependency advisories | P1 | M | — | BLOCKED — two isolated executors stalled before tracked dependency edits; no commit produced |
+| 007 | Remove all high-severity dependency advisories | P1 | M | — | BLOCKED — three isolated executor attempts stalled before dependency edits; main files preserved |
 | 008 | Reject cross-site and non-JSON AI requests | P1 | M | — | TODO |
 | 009 | Fail closed without distributed rate limiting | P1 | M | — | TODO |
 | 010 | Prevent untrusted web evidence from steering OBS | P1 | M | — | TODO |

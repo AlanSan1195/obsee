@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../store';
 import type { ConsoleComponentSpec } from '../../shared/types';
+import { InlineEmphasis } from './InlineEmphasis';
 import { IconAlert, IconCheck, IconMonitor, IconTv, Section, Spinner } from './ui';
 
 function safeHostname(url: string): string {
@@ -106,17 +107,6 @@ export function ConsoleReport() {
         </div>
       </div>
 
-      {profile.consoleSettings.length > 0 && (
-        <div className="mt-4 rounded-none border border-border bg-surface/45 p-4">
-          <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-text-muted">Ajustes en la consola</span>
-          <ol className="list-decimal space-y-1.5 pl-5 text-sm text-text-muted">
-            {profile.consoleSettings.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ol>
-        </div>
-      )}
-
       {profile.sources && profile.sources.length > 0 && (
         <p className="mt-3 text-xs text-text-faint">
           Fuentes consultadas:{' '}
@@ -129,7 +119,11 @@ export function ConsoleReport() {
         </p>
       )}
 
-      {consoleProfile.reasoning && <p className="mt-3 text-xs leading-relaxed text-text-muted">{consoleProfile.reasoning}</p>}
+      {consoleProfile.reasoning && (
+        <p className="mt-3 text-xs leading-relaxed text-text-muted">
+          <InlineEmphasis text={consoleProfile.reasoning} />
+        </p>
+      )}
       <p className="mt-3 text-xs text-text-faint">Los ajustes de OBS recomendados (abajo) ya estan limitados al techo de tu captura.</p>
     </Section>
   );

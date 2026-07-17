@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getLocalRecommendation, getLocalRecommendationExplanation } from './localRecommendation';
+import { getLocalRecommendation, getLocalRecommendationExplanation, isRecommendationExplanationConsistent } from './localRecommendation';
 import type { AIRecommendationExplanationRequest, AIRecommendationRequest, SystemInfo } from './types';
 
 type SystemInfoOverrides = {
@@ -68,7 +68,8 @@ describe('getLocalRecommendation', () => {
     const result = getLocalRecommendation(makeRequest());
 
     expect(result.source).toBe('local');
-    expect(result.reasoning).toBe('Recomendacion local generada a partir de los nucleos de CPU, la RAM, el proveedor de GPU, la plataforma y el modo seleccionados (la IA no estuvo disponible).');
+    expect(result.reasoning).toContain('**encoder NVENC** hace match');
+    expect(result.reasoning).toContain('**stream 1920x1080 a 6000 kbps**');
   });
 
   it('sube bitrate en YouTube cuando tambien se graba', () => {
@@ -166,7 +167,7 @@ describe('getLocalRecommendation', () => {
     expect(result.recommendations.bitrate).toBe(12000);
     // El encoder se ajusta al optimo del hardware (NVENC), no al x264 que tenia OBS.
     expect(result.recommendations.encoder).toBe('nvenc');
-    expect(result.reasoning).toContain('configuracion que OBS ya tenia');
+    expect(result.reasoning).toContain('base que OBS ya habia ajustado');
   });
 
   it('ignora la config base si supera lo que el hardware sostiene', () => {
@@ -223,8 +224,30 @@ describe('getLocalRecommendationExplanation', () => {
     const explanation = getLocalRecommendationExplanation(explanationRequest);
 
     expect(explanation.source).toBe('local');
-    expect(explanation.reasoning).toContain('resolucion del stream: 1920X1080 -> 2560X1440');
-    expect(explanation.reasoning).toContain('bitrate del stream: 9000 -> 8000');
+    expect(explanation.reasoning).toContain('Cambiaste **resolucion del stream** de **1920X1080** a **2560X1440**');
+    expect(explanation.reasoning).toContain('Cambiaste **bitrate del stream** de **9000** a **8000**');
     expect(explanation.reasoning).toContain('carga de video sube');
+  });
+
+  it('rechaza una explicacion de encoder que invierte el efecto sobre el CPU', () => {
+    const request = makeRequest({
+      systemInfo: { gpu: { vendor: 'Apple', model: 'Apple M4', hasNvenc: false } },
+    });
+    const originalRecommendations = getLocalRecommendation(request).recommendations;
+    const explanationRequest: AIRecommendationExplanationRequest = {
+      ...request,
+      originalRecommendations,
+      currentRecommendations: { ...originalRecommendations, encoder: 'x264' },
+      changedFields: ['encoder'],
+    };
+
+    expect(isRecommendationExplanationConsistent(
+      explanationRequest,
+      'Con x264 la carga del CPU disminuye y mejora la estabilidad.',
+    )).toBe(false);
+    expect(isRecommendationExplanationConsistent(
+      explanationRequest,
+      'Con x264 la carga del CPU aumenta y hay menos margen bajo carga.',
+    )).toBe(true);
   });
 });

@@ -100,8 +100,9 @@ describe('getLocalConsoleProfile', () => {
       recording_encoder: 'apple vt hevc',
       recording_bitrate: 40000,
     });
-    expect(result.reasoning).toContain('stream 1920x1080 con apple vt h264');
-    expect(result.reasoning).toContain('grabacion 3840x2160 con apple vt hevc a 40000kbps');
+    expect(result.reasoning).toContain('**stream 1920x1080 a 6000 kbps**');
+    expect(result.reasoning).toContain('**grabacion 3840x2160 con APPLE VT HEVC a 40000 kbps**');
+    expect(result.reasoning).toContain('**encoder APPLE VT H264**');
     expect(result.reasoning).not.toContain('NVENC');
     expect(result.profile.bottleneck).toContain('capturadora fija el techo');
   });
@@ -129,7 +130,8 @@ describe('getLocalConsoleProfile', () => {
 
     expect(result.source).toBe('ai');
     expect(result.profile.bottleneck).toContain('OBS verifico');
-    expect(result.reasoning).toContain('Configuracion final');
+    expect(result.reasoning).toContain('hacen match');
+    expect(result.reasoning).toContain('**stream 1920x1080');
     expect(result.reasoning).not.toContain('IA no estuvo disponible');
     expect(result.recommendations).toMatchObject({
       canvas_resolution: '3840x2160',

@@ -106,8 +106,12 @@ export interface OBSConfig {
   streamResolution?: string;
   recordingResolution?: string;
   fps: number;
+  // `encoder` y `bitrate` pertenecen al stream. La grabacion puede usar un
+  // codec y una tasa mucho mayores en modo avanzado.
   encoder: string;
   bitrate: number;
+  recordingEncoder?: string;
+  recordingBitrate?: number;
   audioBitrate: number;
   recordingFormat: string;
   recordingQuality?: string;
@@ -238,8 +242,12 @@ export type AIRecommendationSettings = {
   resolution: string;
   recording_resolution: string;
   fps: number;
+  // `encoder` y `bitrate` son exclusivos de la emision. La grabacion conserva
+  // su propio perfil para no degradar el archivo local al limite del stream.
   encoder: string;
   bitrate: number;
+  recording_encoder: string;
+  recording_bitrate: number;
   audio_bitrate: number;
   recording_format: string;
   recording_quality: string;

@@ -1,5 +1,10 @@
 import type { ConsoleComponentSpec, ConsoleModel, ConsoleProfileRequest, ConsoleProfileResponse } from './types';
-import { getLocalRecommendation, getPreferredEncoder } from './localRecommendation';
+import {
+  getLocalRecommendation,
+  getPreferredEncoder,
+  getPreferredRecordingEncoder,
+  getRecordingBitrate,
+} from './localRecommendation';
 import { parseResolution, validateConsoleProfileResponse } from './validation';
 
 // Respaldo offline del analisis de consola: sin IA ni web, infiere capacidades a
@@ -57,6 +62,17 @@ export function normalizeConsoleProfileForRequest(
     ? streamResolution
     : verifiedCaptureResolution;
   const preferredEncoder = getPreferredEncoder(request.systemInfo);
+  const wantsRecording = request.mode !== 'stream_only';
+  const preferredRecordingEncoder = wantsRecording
+    ? getPreferredRecordingEncoder(request.systemInfo)
+    : preferredEncoder;
+  const recordingBitrate = wantsRecording
+    ? getRecordingBitrate(
+      recordingResolution,
+      Math.min(response.recommendations.fps, verifiedCaptureFps),
+      preferredRecordingEncoder,
+    )
+    : response.recommendations.bitrate;
   const hasVerifiedCaptureCaps = Boolean(request.captureMaxResolution);
   const captureLimitsConsole = resPixels(verifiedCaptureResolution) < resPixels(consoleCaps.resolution)
     || verifiedCaptureFps < consoleCaps.fps;
@@ -69,7 +85,7 @@ export function normalizeConsoleProfileForRequest(
   const evidence = sourceCount > 0
     ? `Se contrastaron ${sourceCount} fuentes web y luego se priorizaron las capacidades reales leidas por OBS.`
     : 'No hubo fuentes web verificadas; se priorizaron las capacidades reales leidas por OBS y el hardware confirmado.';
-  const reasoning = `${evidence} Configuracion final: lienzo ${verifiedCaptureResolution}, stream ${streamResolution}, grabacion ${recordingResolution}, ${Math.min(response.recommendations.fps, verifiedCaptureFps)}fps y encoder ${preferredEncoder}.`;
+  const reasoning = `${evidence} Configuracion final: lienzo ${verifiedCaptureResolution}; stream ${streamResolution} con ${preferredEncoder} a ${response.recommendations.bitrate}kbps; grabacion ${recordingResolution} con ${preferredRecordingEncoder} a ${recordingBitrate}kbps; ${Math.min(response.recommendations.fps, verifiedCaptureFps)}fps.`;
   const monitorIsKnown = isKnownMonitorName(request.monitor ?? '');
 
   return {
@@ -108,6 +124,8 @@ export function normalizeConsoleProfileForRequest(
       recording_resolution: recordingResolution,
       fps: Math.min(response.recommendations.fps, verifiedCaptureFps),
       encoder: preferredEncoder,
+      recording_encoder: preferredRecordingEncoder,
+      recording_bitrate: recordingBitrate,
     },
     reasoning,
   };
@@ -227,6 +245,9 @@ export function getLocalConsoleProfile(request: ConsoleProfileRequest): ConsoleP
     resolution: streamResolution,
     recording_resolution: wantsRecording ? captureResolution : streamResolution,
     fps: Math.min(base.fps, captureFps),
+    recording_bitrate: wantsRecording
+      ? getRecordingBitrate(captureResolution, Math.min(base.fps, captureFps), base.recording_encoder)
+      : base.bitrate,
   };
 
   const consoleSpec: ConsoleComponentSpec = {
@@ -278,6 +299,6 @@ export function getLocalConsoleProfile(request: ConsoleProfileRequest): ConsoleP
       ],
     },
     recommendations,
-    reasoning: `Perfil de consola generado localmente (la IA no estuvo disponible). ${bottleneck} Lienzo ${recommendations.canvas_resolution}, stream ${recommendations.resolution} y grabacion ${recommendations.recording_resolution}.`,
+    reasoning: `Perfil de consola generado localmente (la IA no estuvo disponible). ${bottleneck} Stream ${recommendations.resolution} con ${recommendations.encoder} a ${recommendations.bitrate}kbps; grabacion ${recommendations.recording_resolution} con ${recommendations.recording_encoder} a ${recommendations.recording_bitrate}kbps.`,
   };
 }

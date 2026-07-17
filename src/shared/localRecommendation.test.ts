@@ -184,6 +184,25 @@ describe('getLocalRecommendation', () => {
     expect(getLocalRecommendation(makeRequest({ mode: 'stream_record' })).recommendations.recording_quality).toBe('high');
     expect(getLocalRecommendation(makeRequest({ mode: 'stream_only' })).recommendations.recording_quality).toBe('stream');
   });
+
+  it('separa encoder y bitrate de grabacion en Apple Silicon', () => {
+    const recording = getLocalRecommendation(makeRequest({
+      systemInfo: { gpu: { vendor: 'Apple', model: 'Apple M4', hasNvenc: false } },
+    })).recommendations;
+    const streamOnly = getLocalRecommendation(makeRequest({
+      mode: 'stream_only',
+      systemInfo: { gpu: { vendor: 'Apple', model: 'Apple M4', hasNvenc: false } },
+    })).recommendations;
+
+    expect(recording).toMatchObject({
+      encoder: 'apple vt h264',
+      bitrate: 6000,
+      recording_encoder: 'apple vt hevc',
+      recording_bitrate: 12000,
+    });
+    expect(streamOnly.recording_encoder).toBe(streamOnly.encoder);
+    expect(streamOnly.recording_bitrate).toBe(streamOnly.bitrate);
+  });
 });
 
 describe('getLocalRecommendationExplanation', () => {
@@ -205,7 +224,7 @@ describe('getLocalRecommendationExplanation', () => {
 
     expect(explanation.source).toBe('local');
     expect(explanation.reasoning).toContain('resolucion del stream: 1920X1080 -> 2560X1440');
-    expect(explanation.reasoning).toContain('bitrate de video: 9000 -> 8000');
+    expect(explanation.reasoning).toContain('bitrate del stream: 9000 -> 8000');
     expect(explanation.reasoning).toContain('carga de video sube');
   });
 });

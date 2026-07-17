@@ -3,6 +3,7 @@ import type { ApiRequest, ApiResponse } from './_lib/http';
 import { readBody, sendJson } from './_lib/http';
 import { checkRateLimit } from './_lib/rate-limit';
 import { validateAIRecommendation, validateAIRecommendationRequest } from '../src/shared/validation';
+import { getPreferredEncoder, getPreferredRecordingEncoder, getRecordingBitrate } from '../src/shared/localRecommendation';
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   response.setHeader('Cache-Control', 'no-store');
@@ -29,9 +30,28 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       return sendJson(response, 502, { message: recommendation.message });
     }
 
+    const preferredStreamEncoder = getPreferredEncoder(validation.value.systemInfo);
+    const wantsRecording = validation.value.mode !== 'stream_only';
+    const preferredRecordingEncoder = wantsRecording
+      ? getPreferredRecordingEncoder(validation.value.systemInfo)
+      : preferredStreamEncoder;
+    const normalizedRecommendations = {
+      ...recommendation.value.recommendations,
+      encoder: preferredStreamEncoder,
+      recording_encoder: preferredRecordingEncoder,
+      recording_bitrate: wantsRecording
+        ? getRecordingBitrate(
+          recommendation.value.recommendations.recording_resolution,
+          recommendation.value.recommendations.fps,
+          preferredRecordingEncoder,
+        )
+        : recommendation.value.recommendations.bitrate,
+    };
+
     response.setHeader('X-RateLimit-Remaining', String(rateLimit.remaining));
     return sendJson(response, 200, {
       ...recommendation.value,
+      recommendations: normalizedRecommendations,
       source: 'ai',
     });
   } catch (error) {

@@ -133,6 +133,9 @@ Campos de resolucion:
 - "resolution": resolucion exclusiva del stream.
 - "recording_resolution": resolucion del archivo grabado.
 - Si el modo incluye stream y grabacion, separa ambas salidas cuando ayude a conservar calidad de grabacion sin exceder la plataforma de streaming.
+- "encoder" y "bitrate" pertenecen exclusivamente al stream.
+- "recording_encoder" y "recording_bitrate" pertenecen exclusivamente al archivo local. No reutilices el bitrate limitado del stream para grabar.
+- En Apple Silicon, prefiere Apple VT H264 para el stream y Apple VT HEVC para grabacion local. Como referencia, 4K60 HEVC puede usar 40000 kbps; 4K60 H264 requiere aproximadamente 60000 kbps.
 
 Responde en JSON con este formato exacto, sin texto adicional:
 {
@@ -143,6 +146,8 @@ Responde en JSON con este formato exacto, sin texto adicional:
     "fps": 60,
     "encoder": "nvenc",
     "bitrate": 6000,
+    "recording_encoder": "nvenc",
+    "recording_bitrate": 16000,
     "audio_bitrate": 320,
     "recording_format": "mkv",
     "recording_quality": "high"
@@ -333,6 +338,8 @@ const CONSOLE_PROFILE_JSON_SHAPE = `Responde SOLO con JSON valido y exactamente 
     "fps": 60,
     "encoder": "nvenc",
     "bitrate": 6000,
+    "recording_encoder": "nvenc",
+    "recording_bitrate": 60000,
     "audio_bitrate": 320,
     "recording_format": "mkv",
     "recording_quality": "high"
@@ -346,6 +353,8 @@ const CONSOLE_PROFILE_RULES = `Reglas:
 - "canvas_resolution" es el lienzo base de OBS y debe preservar la resolucion nativa de captura cuando el hardware pueda procesarla.
 - "resolution" es EXCLUSIVAMENTE la salida del stream. Ajustala a la plataforma; en Twitch normalmente 1920x1080 aunque se capture y grabe en 4K.
 - "recording_resolution" es la resolucion del archivo grabado. Si el modo incluye grabacion y la capturadora entrega 4K60, conserva 3840x2160 cuando el hardware de la PC pueda codificarlo.
+- "encoder"/"bitrate" son solo para emision; "recording_encoder"/"recording_bitrate" son solo para el archivo local y deben recomendarse por separado.
+- En una Mac Apple Silicon, usa Apple VT H264 para el stream y Apple VT HEVC para la grabacion. Para grabacion 4K60 usa 40000 kbps con HEVC; con H264 usa alrededor de 60000 kbps. Nunca reduzcas la grabacion al bitrate del stream.
 - En modo "stream_record", lienzo/grabacion y stream pueden ser distintos: por ejemplo 3840x2160 para lienzo y grabacion, 1920x1080 para Twitch.
 - "recommendations" son los ajustes de OBS en la PC: usa el hardware de la PC para "encoder"/"bitrate" y nunca superes el techo real de la capturadora.
 - "consoleSettings": pasos concretos para ajustar la salida de video de la consola (resolucion, fps, HDR/RGB) de forma compatible con la capturadora.
@@ -477,8 +486,10 @@ Configuracion original:
 - Resolucion del stream: ${originalRecommendations.resolution}
 - Resolucion de grabacion: ${originalRecommendations.recording_resolution}
 - FPS: ${originalRecommendations.fps}
-- Encoder: ${originalRecommendations.encoder}
-- Bitrate de video: ${originalRecommendations.bitrate} kbps
+- Encoder del stream: ${originalRecommendations.encoder}
+- Bitrate del stream: ${originalRecommendations.bitrate} kbps
+- Encoder de grabacion: ${originalRecommendations.recording_encoder}
+- Bitrate de grabacion: ${originalRecommendations.recording_bitrate} kbps
 - Bitrate de audio: ${originalRecommendations.audio_bitrate} kbps
 - Formato de grabacion: ${originalRecommendations.recording_format}
 - Calidad de grabacion: ${originalRecommendations.recording_quality}
@@ -488,8 +499,10 @@ Configuracion actual modificada:
 - Resolucion del stream: ${currentRecommendations.resolution}
 - Resolucion de grabacion: ${currentRecommendations.recording_resolution}
 - FPS: ${currentRecommendations.fps}
-- Encoder: ${currentRecommendations.encoder}
-- Bitrate de video: ${currentRecommendations.bitrate} kbps
+- Encoder del stream: ${currentRecommendations.encoder}
+- Bitrate del stream: ${currentRecommendations.bitrate} kbps
+- Encoder de grabacion: ${currentRecommendations.recording_encoder}
+- Bitrate de grabacion: ${currentRecommendations.recording_bitrate} kbps
 - Bitrate de audio: ${currentRecommendations.audio_bitrate} kbps
 - Formato de grabacion: ${currentRecommendations.recording_format}
 - Calidad de grabacion: ${currentRecommendations.recording_quality}

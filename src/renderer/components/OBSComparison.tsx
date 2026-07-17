@@ -19,6 +19,7 @@ function normalize(value: string): string {
 function normalizeEncoder(value: string): string {
   const normalized = normalize(value).replace(/[_-]/g, ' ');
 
+  if ((normalized.includes('apple') || normalized.includes('videotoolbox')) && (normalized.includes('hevc') || normalized.includes('h265') || normalized.includes('h.265'))) return 'apple_hevc';
   if (normalized.includes('apple') || normalized.includes('videotoolbox')) return 'apple_h264';
   if (normalized.includes('nvenc') || normalized.includes('nvidia')) return 'nvenc';
   if (normalized.includes('qsv') || normalized.includes('quick sync') || normalized.includes('intel')) return 'qsv';
@@ -80,7 +81,7 @@ export function buildComparisonRows(
       recommended: String(recommendations.fps),
     },
     {
-      label: 'Encoder',
+      label: 'Encoder del stream',
       current: snapshot.encoder,
       recommended: recommendations.encoder,
       type: 'encoder',
@@ -89,6 +90,17 @@ export function buildComparisonRows(
       label: 'Bitrate del stream',
       current: String(snapshot.bitrate),
       recommended: String(recommendations.bitrate),
+    },
+    {
+      label: 'Encoder de grabacion',
+      current: snapshot.advancedOutput?.recordingEncoder ?? snapshot.encoder,
+      recommended: recommendations.recording_encoder,
+      type: 'encoder',
+    },
+    {
+      label: 'Bitrate de grabacion',
+      current: 'Desconocido',
+      recommended: String(recommendations.recording_bitrate),
     },
     {
       label: 'Bitrate de audio',

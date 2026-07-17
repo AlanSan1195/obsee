@@ -13,6 +13,8 @@ const recommendationFields: AIRecommendationField[] = [
   'fps',
   'encoder',
   'bitrate',
+  'recording_encoder',
+  'recording_bitrate',
   'audio_bitrate',
   'recording_format',
   'recording_quality',
@@ -224,6 +226,21 @@ export function validateOBSConfig(value: unknown): ValidationResult<OBSConfig> {
     return { success: false, message: 'Bitrate must be a number between 1 and 100000.' };
   }
 
+  const recordingEncoderValue = isNonEmptyString(value.recordingEncoder)
+    ? value.recordingEncoder
+    : value.encoder;
+  const recordingBitrateValue = isPositiveNumber(value.recordingBitrate)
+    ? value.recordingBitrate
+    : value.bitrate;
+
+  if (!isNonEmptyString(recordingEncoderValue)) {
+    return { success: false, message: 'Recording encoder is required.' };
+  }
+
+  if (!isPositiveNumber(recordingBitrateValue) || recordingBitrateValue > 200000) {
+    return { success: false, message: 'Recording bitrate must be a number between 1 and 200000.' };
+  }
+
   if (!isPositiveNumber(value.audioBitrate) || value.audioBitrate > 1024) {
     return { success: false, message: 'Audio bitrate must be a number between 1 and 1024.' };
   }
@@ -253,6 +270,8 @@ export function validateOBSConfig(value: unknown): ValidationResult<OBSConfig> {
       fps: Math.round(value.fps),
       encoder: value.encoder.trim().toLowerCase(),
       bitrate: Math.round(value.bitrate),
+      recordingEncoder: recordingEncoderValue.trim().toLowerCase(),
+      recordingBitrate: Math.round(recordingBitrateValue),
       audioBitrate: Math.round(value.audioBitrate),
       recordingFormat: value.recordingFormat.trim().toLowerCase(),
       recordingQuality: isNonEmptyString(value.recordingQuality) ? value.recordingQuality.trim().toLowerCase() : undefined,
@@ -495,6 +514,21 @@ export function validateAIRecommendation(value: unknown): ValidationResult<Omit<
     return { success: false, message: 'AI recommendation has invalid bitrate.' };
   }
 
+  const recordingEncoder = isNonEmptyString(recommendation.recording_encoder)
+    ? recommendation.recording_encoder
+    : recommendation.encoder;
+  const recordingBitrate = isPositiveNumber(recommendation.recording_bitrate)
+    ? recommendation.recording_bitrate
+    : recommendation.bitrate;
+
+  if (!isNonEmptyString(recordingEncoder)) {
+    return { success: false, message: 'AI recommendation is missing recording encoder.' };
+  }
+
+  if (!isPositiveNumber(recordingBitrate) || recordingBitrate > 200000) {
+    return { success: false, message: 'AI recommendation has invalid recording bitrate.' };
+  }
+
   if (!isPositiveNumber(recommendation.audio_bitrate) || recommendation.audio_bitrate > 1024) {
     return { success: false, message: 'AI recommendation has invalid audio bitrate.' };
   }
@@ -513,6 +547,8 @@ export function validateAIRecommendation(value: unknown): ValidationResult<Omit<
         fps: Math.round(recommendation.fps),
         encoder: recommendation.encoder.trim().toLowerCase(),
         bitrate: Math.round(recommendation.bitrate),
+        recording_encoder: recordingEncoder.trim().toLowerCase(),
+        recording_bitrate: Math.round(recordingBitrate),
         audio_bitrate: Math.round(recommendation.audio_bitrate),
         recording_format: recommendation.recording_format.trim().toLowerCase(),
         recording_quality: recommendation.recording_quality.trim().toLowerCase(),

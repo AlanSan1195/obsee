@@ -21,6 +21,8 @@ const recommendations: AIRecommendation['recommendations'] = {
   fps: 60,
   encoder: 'nvenc',
   bitrate: 6000,
+  recording_encoder: 'nvenc',
+  recording_bitrate: 60000,
   audio_bitrate: 320,
   recording_format: 'mkv',
   recording_quality: 'high',
@@ -34,6 +36,21 @@ describe('isSameValue', () => {
       recommended: 'nvenc',
       type: 'encoder',
     })).toBe(true);
+  });
+
+  it('distingue Apple VideoToolbox H264 de HEVC', () => {
+    expect(isSameValue({
+      label: 'Encoder de grabacion',
+      current: 'com.apple.videotoolbox.videoencoder.ave.hevc',
+      recommended: 'apple vt hevc',
+      type: 'encoder',
+    })).toBe(true);
+    expect(isSameValue({
+      label: 'Encoder de grabacion',
+      current: 'com.apple.videotoolbox.videoencoder.ave.avc',
+      recommended: 'apple vt hevc',
+      type: 'encoder',
+    })).toBe(false);
   });
 
   it('normaliza calidades de grabacion equivalentes', () => {
@@ -50,9 +67,11 @@ describe('buildComparisonRows', () => {
   it('construye filas comparables desde snapshot y recomendacion', () => {
     const rows = buildComparisonRows(snapshot, recommendations);
 
-    expect(rows).toHaveLength(9);
+    expect(rows).toHaveLength(11);
     expect(rows.find((row) => row.label === 'Lienzo base')?.recommended).toBe('3840x2160');
     expect(rows.find((row) => row.label === 'Salida del stream')?.recommended).toBe('1920x1080');
     expect(rows.find((row) => row.label === 'Salida maestra / grabacion')?.recommended).toBe('3840x2160');
+    expect(rows.find((row) => row.label === 'Encoder de grabacion')?.recommended).toBe('nvenc');
+    expect(rows.find((row) => row.label === 'Bitrate de grabacion')?.recommended).toBe('60000');
   });
 });

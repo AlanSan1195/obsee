@@ -64,6 +64,7 @@ describe('getSimpleEncoderId', () => {
 describe('getAdvancedEncoderId', () => {
   it('mapea Apple y los encoders de hardware a IDs avanzados de OBS', () => {
     expect(getAdvancedEncoderId('apple vt h264')).toBe('com.apple.videotoolbox.videoencoder.ave.avc');
+    expect(getAdvancedEncoderId('apple vt hevc')).toBe('com.apple.videotoolbox.videoencoder.ave.hevc');
     expect(getAdvancedEncoderId('nvenc h264')).toBe('ffmpeg_nvenc');
     expect(getAdvancedEncoderId('qsv')).toBe('obs_qsv11');
     expect(getAdvancedEncoderId('amd')).toBe('h264_texture_amf');

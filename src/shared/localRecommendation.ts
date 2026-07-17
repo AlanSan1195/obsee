@@ -12,6 +12,34 @@ export function getPreferredEncoder(systemInfo: SystemInfo): string {
   return 'x264';
 }
 
+export function getPreferredRecordingEncoder(systemInfo: SystemInfo): string {
+  const vendor = systemInfo.gpu.vendor.toLowerCase();
+  const model = systemInfo.gpu.model.toLowerCase();
+
+  // OBS en Apple Silicon expone VideoToolbox HEVC por hardware. En otros
+  // proveedores conservamos el encoder H.264 ya verificado para no asumir IDs
+  // HEVC que cambian entre generaciones y plugins.
+  if (vendor.includes('apple') || model.includes('apple')) return 'apple vt hevc';
+  return getPreferredEncoder(systemInfo);
+}
+
+export function getRecordingBitrate(resolution: string, fps: number, encoder: string): number {
+  const dims = readResolutionDims(resolution);
+  if (!dims) return 16000;
+
+  const pixels = dims.width * dims.height;
+  const highFrameRate = fps >= 50;
+  const usesHevc = /hevc|h265|h\.265/.test(encoder.toLowerCase());
+
+  if (pixels >= 3840 * 2160) {
+    if (usesHevc) return highFrameRate ? 40000 : 30000;
+    return highFrameRate ? 60000 : 40000;
+  }
+  if (pixels >= 2560 * 1440) return highFrameRate ? (usesHevc ? 20000 : 24000) : 16000;
+  if (pixels >= 1920 * 1080) return highFrameRate ? (usesHevc ? 12000 : 16000) : 10000;
+  return highFrameRate ? 7500 : 5000;
+}
+
 function readResolutionDims(resolution: string): { width: number; height: number } | null {
   const [width, height] = resolution.split('x').map(Number);
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
@@ -73,6 +101,9 @@ function getVideoProfile(request: AIRecommendationRequest, encoder: string) {
 
 export function getLocalRecommendation(request: AIRecommendationRequest): AIRecommendation {
   const encoder = getPreferredEncoder(request.systemInfo);
+  const recordingEncoder = request.mode === 'stream_only'
+    ? encoder
+    : getPreferredRecordingEncoder(request.systemInfo);
   const videoProfile = getVideoProfile(request, encoder);
   const recordingQuality = request.mode === 'stream_only' ? 'stream' : 'high';
 
@@ -89,6 +120,10 @@ export function getLocalRecommendation(request: AIRecommendationRequest): AIReco
       fps: videoProfile.fps,
       encoder,
       bitrate: videoProfile.bitrate,
+      recording_encoder: recordingEncoder,
+      recording_bitrate: request.mode === 'stream_only'
+        ? videoProfile.bitrate
+        : getRecordingBitrate(videoProfile.resolution, videoProfile.fps, recordingEncoder),
       audio_bitrate: 320,
       recording_format: 'mkv',
       recording_quality: recordingQuality,
@@ -102,8 +137,10 @@ const fieldLabels: Record<AIRecommendationField, string> = {
   resolution: 'resolucion del stream',
   recording_resolution: 'resolucion de grabacion',
   fps: 'FPS',
-  encoder: 'encoder',
-  bitrate: 'bitrate de video',
+  encoder: 'encoder del stream',
+  bitrate: 'bitrate del stream',
+  recording_encoder: 'encoder de grabacion',
+  recording_bitrate: 'bitrate de grabacion',
   audio_bitrate: 'bitrate de audio',
   recording_format: 'formato de grabacion',
   recording_quality: 'calidad de grabacion',
@@ -122,22 +159,13 @@ function getWorkload(settings: AIRecommendationSettings): number {
 }
 
 function getBitrateGuidance(settings: AIRecommendationSettings, platform: AIRecommendationRequest['platform']): string {
-  const workload = getWorkload(settings);
   const bitrate = settings.bitrate;
 
   if (platform === 'twitch' && bitrate > 8000) {
     return 'En Twitch ese bitrate puede superar lo que muchos viewers reciben de forma estable; si no eres partner o tu audiencia tiene conexiones variadas, conviene vigilar cortes y buffering.';
   }
 
-  if (workload >= 3840 * 2160 * 60 && bitrate < 35000) {
-    return 'Para 4K a 60 FPS el bitrate elegido puede quedarse corto: la imagen probablemente tendra mas compresion en movimiento rapido.';
-  }
-
-  if (workload >= 2560 * 1440 * 60 && bitrate < 12000) {
-    return 'Para 1440p a 60 FPS el bitrate es moderado; deberia verse bien en escenas tranquilas, pero puede perder detalle en juegos rapidos.';
-  }
-
-  if (workload >= 1920 * 1080 * 60 && bitrate < 6000) {
+  if (readResolutionPixels(settings.resolution) >= 1920 * 1080 && settings.fps >= 60 && bitrate < 6000) {
     return 'Para 1080p a 60 FPS el bitrate esta en el borde bajo; prioriza estabilidad, pero puede mostrar artefactos si hay mucho movimiento.';
   }
 
@@ -145,7 +173,16 @@ function getBitrateGuidance(settings: AIRecommendationSettings, platform: AIReco
     return 'Ese bitrate es alto para 720p; no deberia mejorar mucho la nitidez y si aumentara consumo de red y archivo.';
   }
 
-  return 'El bitrate queda en un rango razonable para la carga de video seleccionada.';
+  const expectedRecordingBitrate = getRecordingBitrate(
+    settings.recording_resolution,
+    settings.fps,
+    settings.recording_encoder,
+  );
+  if (settings.recording_bitrate < expectedRecordingBitrate * 0.75) {
+    return `El stream queda en un rango razonable, pero la grabacion local puede perder detalle; para ${settings.recording_resolution} conviene acercarse a ${expectedRecordingBitrate} kbps con ${settings.recording_encoder}.`;
+  }
+
+  return 'Los bitrates de stream y grabacion quedan separados: estabilidad para emitir y mayor calidad para el archivo local.';
 }
 
 function getEncoderGuidance(settings: AIRecommendationSettings, request: AIRecommendationExplanationRequest): string {

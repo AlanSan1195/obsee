@@ -97,8 +97,11 @@ describe('getLocalConsoleProfile', () => {
       recording_resolution: '3840x2160',
       fps: 60,
       encoder: 'apple vt h264',
+      recording_encoder: 'apple vt hevc',
+      recording_bitrate: 40000,
     });
-    expect(result.reasoning).toContain('encoder apple vt h264');
+    expect(result.reasoning).toContain('stream 1920x1080 con apple vt h264');
+    expect(result.reasoning).toContain('grabacion 3840x2160 con apple vt hevc a 40000kbps');
     expect(result.reasoning).not.toContain('NVENC');
     expect(result.profile.bottleneck).toContain('capturadora fija el techo');
   });
@@ -133,6 +136,8 @@ describe('getLocalConsoleProfile', () => {
       resolution: '1920x1080',
       recording_resolution: '3840x2160',
       encoder: 'nvenc',
+      recording_encoder: 'nvenc',
+      recording_bitrate: 60000,
     });
   });
 

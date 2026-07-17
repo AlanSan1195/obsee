@@ -59,6 +59,10 @@ export function getSimpleEncoderId(encoder: string): string | null {
 export function getAdvancedEncoderId(encoder: string): string | null {
   const normalized = encoder.toLowerCase();
 
+  if ((normalized.includes('apple') || normalized.includes('videotoolbox'))
+    && (normalized.includes('hevc') || normalized.includes('h265') || normalized.includes('h.265'))) {
+    return 'com.apple.videotoolbox.videoencoder.ave.hevc';
+  }
   if (normalized.includes('nvenc') || normalized.includes('nvidia')) return 'ffmpeg_nvenc';
   if (normalized.includes('x264')) return 'obs_x264';
   if (normalized.includes('qsv') || normalized.includes('quick sync')) return 'obs_qsv11';

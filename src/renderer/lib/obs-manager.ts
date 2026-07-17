@@ -495,6 +495,8 @@ export class OBSManager {
 
       const normalizedStreamResolution = `${streamResolution.value.width}x${streamResolution.value.height}`;
       const normalizedRecordingResolution = `${recordingResolution.value.width}x${recordingResolution.value.height}`;
+      const recordingEncoder = config.recordingEncoder ?? config.encoder;
+      const recordingBitrate = config.recordingBitrate ?? config.bitrate;
 
       const outputResolution = config.mode === 'stream_only'
         ? streamResolution.value
@@ -508,19 +510,20 @@ export class OBSManager {
         fpsDenominator: 1,
       });
 
-      const hasIndependentOutputs = config.mode === 'stream_record'
-        && (streamResolution.value.width !== recordingResolution.value.width
-          || streamResolution.value.height !== recordingResolution.value.height);
+      // El modo avanzado es necesario siempre que existe una grabacion: solo ahi
+      // OBS permite elegir un encoder local distinto al encoder del stream.
+      const needsAdvancedOutput = config.mode !== 'stream_only';
       const profileUpdates: Array<{ category: string; name: string; value: string }> = [];
 
-      if (hasIndependentOutputs) {
-        const advancedEncoderId = getAdvancedEncoderId(config.encoder);
+      if (needsAdvancedOutput) {
+        const streamEncoderId = getAdvancedEncoderId(config.encoder);
+        const recordingEncoderId = getAdvancedEncoderId(recordingEncoder);
+        const streamNeedsRescale = normalizedStreamResolution !== normalizedRecordingResolution;
         profileUpdates.push(
           { category: 'Output', name: 'Mode', value: 'Advanced' },
-          { category: 'AdvOut', name: 'ApplyServiceSettings', value: 'true' },
           { category: 'AdvOut', name: 'RescaleRes', value: normalizedStreamResolution },
-          // OBS_SCALE_LANCZOS = 4. Cualquier valor distinto de 0 activa el escalado por encoder.
-          { category: 'AdvOut', name: 'RescaleFilter', value: '4' },
+          // OBS_SCALE_LANCZOS = 4. Cero conserva la salida maestra sin reescalar.
+          { category: 'AdvOut', name: 'RescaleFilter', value: streamNeedsRescale ? '4' : '0' },
           { category: 'AdvOut', name: 'TrackIndex', value: '1' },
           { category: 'AdvOut', name: 'RecType', value: 'Standard' },
           { category: 'AdvOut', name: 'RecFormat2', value: config.recordingFormat },
@@ -530,16 +533,29 @@ export class OBSManager {
           { category: 'AdvOut', name: 'Track1Bitrate', value: String(config.audioBitrate) },
         );
 
-        if (advancedEncoderId) {
-          profileUpdates.push(
-            { category: 'AdvOut', name: 'Encoder', value: advancedEncoderId },
-            { category: 'AdvOut', name: 'RecEncoder', value: advancedEncoderId },
-          );
-        } else {
+        if (config.mode === 'stream_record') {
+          profileUpdates.push({ category: 'AdvOut', name: 'ApplyServiceSettings', value: 'true' });
+        }
+
+        if (streamEncoderId && config.mode === 'stream_record') {
+          profileUpdates.push({ category: 'AdvOut', name: 'Encoder', value: streamEncoderId });
+        } else if (!streamEncoderId && config.mode === 'stream_record') {
           warnings.push(`Encoder "${config.encoder}" was not mapped to an OBS Advanced Output encoder.`);
         }
 
-        warnings.push(`OBS quedo en modo avanzado para grabar a ${normalizedRecordingResolution} y transmitir a ${normalizedStreamResolution}. Revisa una vez los controles avanzados de bitrate/calidad del encoder; obs-websocket no expone esos archivos internos.`);
+        if (recordingEncoderId) {
+          profileUpdates.push({ category: 'AdvOut', name: 'RecEncoder', value: recordingEncoderId });
+        } else {
+          warnings.push(`Encoder de grabacion "${recordingEncoder}" no se pudo asignar a OBS Advanced Output.`);
+        }
+
+        const outputSummary = config.mode === 'stream_record'
+          ? `stream ${normalizedStreamResolution} con ${config.encoder} y grabacion ${normalizedRecordingResolution} con ${recordingEncoder}`
+          : `grabacion ${normalizedRecordingResolution} con ${recordingEncoder}`;
+        const bitrateSummary = config.mode === 'stream_record'
+          ? `emision ${config.bitrate}kbps y grabacion ${recordingBitrate}kbps`
+          : `grabacion ${recordingBitrate}kbps`;
+        warnings.push(`OBS quedo en modo avanzado con perfiles separados: ${outputSummary}. Se aplicaron resoluciones y encoders. Objetivos de bitrate: ${bitrateSummary}; obs-websocket no permite escribir los controles internos de bitrate/calidad de los encoders avanzados, asi que debes confirmarlos una vez en Ajustes > Salida.`);
       } else {
         const encoderId = getSimpleEncoderId(config.encoder);
         profileUpdates.push(

@@ -14,13 +14,15 @@ const recommendationFields: AIRecommendationField[] = [
   'fps',
   'encoder',
   'bitrate',
+  'recording_encoder',
+  'recording_bitrate',
   'audio_bitrate',
   'recording_format',
   'recording_quality',
 ];
 const resolutionOptions = ['1280x720', '1920x1080', '2560x1440', '3840x2160'];
 const fpsOptions = [30, 60, 120];
-const encoderOptions = ['apple vt h264', 'nvenc', 'x264', 'qsv', 'amd'];
+const encoderOptions = ['apple vt h264', 'apple vt hevc', 'nvenc', 'x264', 'qsv', 'amd'];
 const audioBitrateOptions = [160, 192, 256, 320];
 const recordingFormatOptions = ['mkv', 'mp4', 'mov'];
 const recordingQualityOptions = ['stream', 'medium', 'high', 'lossless'];
@@ -175,8 +177,10 @@ function isUsableRecommendation(settings: RecommendationSettings): boolean {
     && /^\d{3,4}x\d{3,4}$/.test(settings.recording_resolution)
     && settings.fps > 0
     && settings.bitrate > 0
+    && settings.recording_bitrate > 0
     && settings.audio_bitrate > 0
     && settings.encoder.trim()
+    && settings.recording_encoder.trim()
     && settings.recording_format.trim()
     && settings.recording_quality.trim(),
   );
@@ -263,6 +267,8 @@ export function Recommendations() {
     recommendation?.originalRecommendations?.encoder,
     recommendation?.originalRecommendations?.fps,
     recommendation?.originalRecommendations?.recording_format,
+    recommendation?.originalRecommendations?.recording_bitrate,
+    recommendation?.originalRecommendations?.recording_encoder,
     recommendation?.originalRecommendations?.recording_quality,
     recommendation?.originalRecommendations?.recording_resolution,
     recommendation?.originalRecommendations?.resolution,
@@ -273,6 +279,8 @@ export function Recommendations() {
     recommendation?.recommendations.encoder,
     recommendation?.recommendations.fps,
     recommendation?.recommendations.recording_format,
+    recommendation?.recommendations.recording_bitrate,
+    recommendation?.recommendations.recording_encoder,
     recommendation?.recommendations.recording_quality,
     recommendation?.recommendations.recording_resolution,
     recommendation?.recommendations.resolution,
@@ -354,7 +362,7 @@ export function Recommendations() {
             onChange={(fps) => updateRecommendations({ fps })}
           />
         </Field>
-        <Field label="Encoder">
+        <Field label="Encoder del stream">
           <SelectField
             value={recommendations.encoder}
             options={encoderOptions}
@@ -369,6 +377,23 @@ export function Recommendations() {
             step={500}
             suffix="kbps"
             onChange={(bitrate) => updateRecommendations({ bitrate })}
+          />
+        </Field>
+        <Field label="Encoder de grabacion">
+          <SelectField
+            value={recommendations.recording_encoder}
+            options={encoderOptions}
+            onChange={(recording_encoder) => updateRecommendations({ recording_encoder })}
+          />
+        </Field>
+        <Field label="Bitrate de grabacion">
+          <NumberField
+            value={recommendations.recording_bitrate}
+            min={500}
+            max={200000}
+            step={500}
+            suffix="kbps"
+            onChange={(recording_bitrate) => updateRecommendations({ recording_bitrate })}
           />
         </Field>
         <Field label="Audio">

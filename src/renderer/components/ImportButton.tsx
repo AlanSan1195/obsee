@@ -40,6 +40,8 @@ export function ImportButton() {
         fps: recommendation.recommendations.fps,
         encoder: recommendation.recommendations.encoder,
         bitrate: recommendation.recommendations.bitrate,
+        recordingEncoder: recommendation.recommendations.recording_encoder,
+        recordingBitrate: recommendation.recommendations.recording_bitrate,
         audioBitrate: recommendation.recommendations.audio_bitrate,
         recordingFormat: recommendation.recommendations.recording_format,
         recordingQuality: recommendation.recommendations.recording_quality,
@@ -52,7 +54,7 @@ export function ImportButton() {
       });
 
       if (result.success) {
-        setObsMessage('Configuracion aplicada correctamente');
+        setObsMessage(result.message);
       } else {
         setError(result.message);
       }

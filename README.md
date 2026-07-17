@@ -38,6 +38,8 @@ Los endpoints de IA aceptan únicamente `POST` con `Content-Type: application/js
 
 Toda implementación de producción con Groq/Tavily requiere `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`. Si cualquiera falta o Upstash no responde, la IA remota falla de forma segura y la aplicación utiliza su recomendación local. `OBSREC_ALLOW_MEMORY_RATE_LIMIT=true` sólo habilita un contador temporal durante desarrollo local; Vercel y `NODE_ENV=production` siempre ignoran esa opción. `OBSREC_AI_DAILY_LIMIT` acepta enteros de 1 a 1000 y vuelve al valor seguro 20 si la configuración no es válida.
 
+Producción también envía una Content Security Policy estricta como header. `pnpm run security:csp` comprueba sus directivas, el hash exacto del JSON-LD de SEO, la conexión WebSocket limitada a localhost y la ausencia de scripts inline inesperados antes del build de Vercel.
+
 ## Arquitectura y decisiones
 
 ```text

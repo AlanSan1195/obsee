@@ -17,6 +17,14 @@
 - **Depends on**: plans/010-contain-untrusted-web-evidence.md
 - **Category**: security
 - **Planned at**: commit `ceb1be2`, 2026-07-16
+- **Implemented**: working tree on `main`, 2026-07-16
+- **Browser verification**: production bundle rendered without CSP errors,
+  localhost OBS WebSocket connected, and a disposable inline executable script
+  remained blocked.
+- **Header/API verification**: same-origin health returned 200 with the exact
+  production CSP header.
+- **Permissions-Policy**: deferred because camera/microphone discovery is an
+  intentional product feature; it needs a separate browser-permission matrix.
 
 ## Why this matters
 
@@ -147,12 +155,12 @@ OBS connection. No CSP violation may be dismissed without understanding it.
 
 ## Done criteria
 
-- [ ] Production sends CSP as an HTTP response header.
-- [ ] `script-src` has no `'unsafe-inline'` and permits only self plus exact hashes.
-- [ ] Local OBS and same-origin API connections still work.
-- [ ] Required restrictive directives are present.
-- [ ] Automated hash drift check passes.
-- [ ] Build, tests, typechecks, and lint pass.
+- [x] Production sends CSP as an HTTP response header.
+- [x] `script-src` has no `'unsafe-inline'` and permits only self plus exact hashes.
+- [x] Local OBS and same-origin API connections still work.
+- [x] Required restrictive directives are present.
+- [x] Automated hash drift check passes.
+- [x] Build, tests, typechecks, and lint pass.
 
 ## STOP conditions
 

@@ -21,7 +21,7 @@ unless a reviewing advisor maintains the index.
 | 008 | Reject cross-site and non-JSON AI requests | P1 | M | — | DONE — shared request guard covers all five quota-bearing endpoints; included in the passing 191-test suite |
 | 009 | Fail closed without distributed rate limiting | P1 | M | — | DONE — production requires Upstash; local memory fallback is explicit and tested |
 | 010 | Prevent untrusted web evidence from steering OBS | P1 | M | — | DONE — exact host policy, bounded prompt evidence, verified source provenance, and OBS output allowlists; 191 tests pass |
-| 011 | Enforce a strict header-based production CSP | P2 | M | 010 | TODO |
+| 011 | Enforce a strict header-based production CSP | P2 | M | 010 | DONE — strict response header and JSON-LD hash checker verified against the production bundle and local browser |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale).
@@ -39,8 +39,8 @@ REJECTED (with one-line rationale).
 - 008 and 009 now protect the request boundary and shared quota layer together.
 - 010 preserves the current user review step and local fallbacks while enforcing
   exact web-source provenance and semantic AI output validation.
-- 011 is now unblocked because external source URLs and prompt provenance are
-  deterministic.
+- 011 now enforces the browser policy after external source URLs and prompt
+  provenance became deterministic in 010.
 
 ## Reconciliation on 2026-07-16
 
@@ -51,8 +51,7 @@ REJECTED (with one-line rationale).
   present. A live audit rerun was unavailable during this reconciliation because
   the npm registry could not be resolved; the immediately preceding successful
   audit reported one low advisory and no high advisories.
-- Plans 008–010 were completed after this reconciliation; plan 011 remains
-  reproducible in the current source and is still TODO.
+- Plans 008–011 were completed after this reconciliation.
 
 ## Deferred findings
 

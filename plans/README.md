@@ -16,8 +16,8 @@ unless a reviewing advisor maintains the index.
 | 003 | Require an editable confirmed CPU core count | P1 | M | 002 | DONE |
 | 004 | Preserve unknown CPU speed and GPU memory honestly | P1 | M | 003 | DONE |
 | 005 | Make the local video ceiling encoder-aware | P2 | M | 004 | DONE |
-| 006 | Keep local credentials private and untrackable | P1 | S | — | BLOCKED — two isolated executors stalled before tracked edits; local `.env` mode is already 0600 |
-| 007 | Remove all high-severity dependency advisories | P1 | M | — | BLOCKED — three isolated executor attempts stalled before dependency edits; main files preserved |
+| 006 | Keep local credentials private and untrackable | P1 | S | — | BLOCKED — local `.env` is 0600, but broad ignore rules, automated checks, and documentation remain unimplemented |
+| 007 | Remove all high-severity dependency advisories | P1 | M | — | DONE — merged into `main` at commit `690c8c0`; last successful audit reported only one low advisory |
 | 008 | Reject cross-site and non-JSON AI requests | P1 | M | — | TODO |
 | 009 | Fail closed without distributed rate limiting | P1 | M | — | TODO |
 | 010 | Prevent untrusted web evidence from steering OBS | P1 | M | — | TODO |
@@ -32,8 +32,9 @@ REJECTED (with one-line rationale).
 - 002 invalidates silently persisted legacy RAM before 003 extends the same persisted record.
 - 003 ensures recommendations use user-confirmed CPU capacity before 004 changes the shared hardware contract.
 - 004 removes fabricated measurements before 005 adjusts decisions made from the remaining trustworthy fields.
-- 006 is operationally independent and should be completed immediately because
-  the current local secret file is mode 0644.
+- 006 is partially applied: the current local secret file is mode 0600. The
+  tracked prevention work is still pending: broad `.env*` ignore rules, a
+  secret-hygiene check, and setup/revocation documentation.
 - 007 is independent but should land before enabling its scheduled audit gate.
 - 008 and 009 address different layers of API abuse protection and may be
   implemented in parallel if separate branches avoid conflicts.
@@ -41,6 +42,17 @@ REJECTED (with one-line rationale).
   tightening web evidence and AI output validation.
 - 011 follows 010 so the browser policy is hardened after external source URLs
   and prompt provenance are deterministic.
+
+## Reconciliation on 2026-07-16
+
+- Plans 001–005 remain present in the implementation and their focused tests
+  are part of the passing 130-test suite.
+- Plan 006 has only its local file-permission action applied; it is not complete.
+- Plan 007 is merged into `main`. The dependency pins and security workflow are
+  present. A live audit rerun was unavailable during this reconciliation because
+  the npm registry could not be resolved; the immediately preceding successful
+  audit reported one low advisory and no high advisories.
+- Plans 008–011 remain reproducible in the current source and are still TODO.
 
 ## Deferred findings
 

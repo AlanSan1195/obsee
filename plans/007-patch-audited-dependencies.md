@@ -31,6 +31,8 @@ clean security gate.
 
 - `package.json:16-36` — direct versions include `groq-sdk ^0.5.0`,
   `obs-websocket-js ^5.0.8`, `vite ^5.4.0`, and `vitest ^3.2.6`.
+- `pnpm-workspace.yaml:1-7` — the repository-level `overrides` map lives here;
+  pnpm 11 ignores `package.json#pnpm.overrides`.
 - `pnpm-lock.yaml:965` — `form-data@4.0.5`; patched at `>=4.0.6`.
 - `pnpm-lock.yaml:1562` — `ws@8.20.1`; patched at `>=8.21.0`.
 - `pnpm-lock.yaml:1475` — `vite@5.4.21`; the reported Windows path-bypass
@@ -60,6 +62,7 @@ frontend and API typechecks, and ESLint all passed at the planned commit.
 
 - `package.json`
 - `pnpm-lock.yaml`
+- `pnpm-workspace.yaml`
 - `vite.config.ts` only if the minimum patched Vite migration requires a real
   configuration adjustment
 - `.github/workflows/security.yml` (create)
@@ -82,15 +85,18 @@ frontend and API typechecks, and ESLint all passed at the planned commit.
 
 ### Step 1: Upgrade direct parents to compatible patched releases
 
-Update the direct packages that own the vulnerable paths. Ensure Vite resolves
+Use the repository's installed pnpm 11.x; do not require a pnpm 10 download or
+`pnpm dlx` step. Update the direct packages that own the vulnerable paths. Ensure Vite resolves
 to at least `6.4.3`, `ws` to at least `8.21.0`, and `form-data` to at least
 `4.0.6`. Prefer current compatible releases of `groq-sdk` and
 `obs-websocket-js`; read their official migration notes before accepting a
 major bump.
 
 If current parent releases still pin a vulnerable transitive version, add only
-exactly targeted `pnpm.overrides` entries for `ws` and/or `form-data`, with a
-comment in the commit body explaining which parent still requires the override.
+exactly targeted `form-data: 4.0.6` and `ws: 8.21.0` entries under the existing
+root `overrides` map in `pnpm-workspace.yaml`, with a comment in the commit body
+explaining which parent requires each override. Do not put overrides under
+`package.json#pnpm`, because pnpm 11 ignores that location in this repo.
 Do not add unused direct runtime dependencies just to manipulate the lockfile.
 
 **Verify**: `pnpm why form-data ws vite` → no resolved version below the three patched minimums.
@@ -106,7 +112,7 @@ Ollama plugin behavior, aliases, relative `base`, and `/api` proxy behavior.
 ### Step 3: Add a continuous audit gate
 
 Create `.github/workflows/security.yml` for pull requests, pushes to the default
-branch, and a weekly schedule. Use Node 22 and pnpm 10, install with
+branch, and a weekly schedule. Use Node 22 and pnpm 11, install with
 `--frozen-lockfile`, and run `pnpm audit --audit-level high`. Set workflow
 permissions to `contents: read`. Do not add third-party actions beyond the
 official checkout, Node setup, and pnpm setup actions already used by the repo.

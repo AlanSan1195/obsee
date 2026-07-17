@@ -1,38 +1,14 @@
 import type { ApiRequest, ApiResponse } from './_lib/http';
-import { readBody, sendJson } from './_lib/http';
+import { readBody, requireJsonPost, sendJson } from './_lib/http';
 import { checkRateLimit } from './_lib/rate-limit';
-
-// Dominios confiables: oficiales, manuales, retailers conocidos
-const trustedDomains = [
-  // Oficiales y manuales
-  'support.', 'manual.', 'manuals.', 'specs.', 'specifications.',
-  'playstation.com', 'xbox.com', 'nintendo.com', 'sony.com',
-  'ugreen.', 'elgato.', 'avermedia.', 'razer.', 'cam-link.',
-  'magewell.', 'blackmagicdesign.', 'atomos.', 'corsair.', 'nzxt.',
-  'lg.com', 'samsung.com', 'asus.com', 'acer.com', 'dell.com', 'benq.com', 'msi.com',
-  // Retailers grandes
-  'amazon.', 'mercadolibre.', 'aliexpress.', 'newegg.', 'bhphotovideo.',
-  'adorama.', 'b&h.', 'sweetwater.', 'bestbuy.', 'walmart.',
-  // Profesionales de specs/reviews
-  'rtings.', 'techpowerup.', 'anandtech.', 'overclock.net',
-];
-
-function isUrlTrusted(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol) || url.includes('...')) return false;
-    const domain = parsed.hostname.toLowerCase();
-    return trustedDomains.some((trusted) => domain.includes(trusted));
-  } catch {
-    return false;
-  }
-}
+import { selectTrustedWebEvidence } from './_lib/web-sources';
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   response.setHeader('Cache-Control', 'no-store');
 
-  if (request.method !== 'POST') {
-    return sendJson(response, 405, { message: 'Method not allowed.' });
+  const boundary = requireJsonPost(request);
+  if (!boundary.allowed) {
+    return sendJson(response, boundary.status, { message: boundary.message });
   }
 
   const rateLimit = await checkRateLimit(request);
@@ -70,12 +46,12 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     }
 
     const data = (await tavilyResponse.json()) as { results?: Array<{ content: string; url: string }> };
-    const trusted = (data.results ?? []).filter((r) => isUrlTrusted(r.url));
+    const trusted = selectTrustedWebEvidence(data.results ?? []);
 
     response.setHeader('X-RateLimit-Remaining', String(rateLimit.remaining));
     return sendJson(response, 200, {
-      results: trusted.map((r) => r.content),
-      sources: trusted.map((r) => r.url),
+      results: trusted.results,
+      sources: trusted.sources,
     });
   } catch (error) {
     console.warn('[web-search] Failed:', error instanceof Error ? error.message : error);

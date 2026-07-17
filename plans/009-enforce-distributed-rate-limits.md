@@ -16,6 +16,7 @@
 - **Depends on**: none
 - **Category**: security
 - **Planned at**: commit `ceb1be2`, 2026-07-16
+- **Implemented**: working tree on `main`, 2026-07-16
 
 ## Why this matters
 
@@ -135,12 +136,12 @@ Create `api/_lib/rate-limit.test.ts` covering:
 
 ## Done criteria
 
-- [ ] Production remote-provider traffic cannot use the in-memory limiter.
-- [ ] Invalid limit configuration cannot disable enforcement.
-- [ ] Rate-limit keys contain bounded normalized identifiers.
-- [ ] Health no longer exposes provider/configuration state.
-- [ ] Local Ollama behavior remains unchanged.
-- [ ] Focused and full verification gates pass.
+- [x] Production remote-provider traffic cannot use the in-memory limiter.
+- [x] Invalid limit configuration cannot disable enforcement.
+- [x] Rate-limit keys contain bounded normalized identifiers.
+- [x] Health no longer exposes provider/configuration state.
+- [x] Local Ollama behavior remains unchanged.
+- [x] Focused and full verification gates pass.
 
 ## STOP conditions
 

@@ -1,4 +1,9 @@
 import type { AIRecommendation, AIRecommendationExplanation, AIRecommendationExplanationRequest, AIRecommendationField, AIRecommendationRequest, AIRecommendationSettings, ApplyGuidedSourceDeviceInput, BeginGuidedSourceInput, CameraLayout, ConsoleComponentSpec, ConsoleModel, ConsoleProfileRequest, ConsoleProfileResponse, CreateGuidedSourceConfig, MicConnection, MicProfileRequest, MicProfileResponse, MicType, NoiseSuppressMethod, OBSAudioConfig, OBSAudioNoiseGate, OBSBackup, OBSConfig, OBSConnectionSettings, OBSMode, OBSPlatform, OBSSettingsSnapshot, SetCameraLayoutInput, SourceKindFriendly, SystemInfo } from './types';
+import {
+  recommendationEncoderOptions,
+  recommendationRecordingFormatOptions,
+  recommendationRecordingQualityOptions,
+} from './recommendationOptions';
 
 type ValidationResult<T> =
   | { success: true; value: T }
@@ -509,6 +514,10 @@ export function validateAIRecommendation(value: unknown): ValidationResult<Omit<
   if (!isNonEmptyString(recommendation.encoder)) {
     return { success: false, message: 'AI recommendation is missing encoder.' };
   }
+  const encoder = recommendation.encoder.trim().toLowerCase();
+  if (!recommendationEncoderOptions.includes(encoder)) {
+    return { success: false, message: 'AI recommendation has unsupported encoder.' };
+  }
 
   if (!isPositiveNumber(recommendation.bitrate) || recommendation.bitrate > 100000) {
     return { success: false, message: 'AI recommendation has invalid bitrate.' };
@@ -524,6 +533,10 @@ export function validateAIRecommendation(value: unknown): ValidationResult<Omit<
   if (!isNonEmptyString(recordingEncoder)) {
     return { success: false, message: 'AI recommendation is missing recording encoder.' };
   }
+  const normalizedRecordingEncoder = recordingEncoder.trim().toLowerCase();
+  if (!recommendationEncoderOptions.includes(normalizedRecordingEncoder)) {
+    return { success: false, message: 'AI recommendation has unsupported recording encoder.' };
+  }
 
   if (!isPositiveNumber(recordingBitrate) || recordingBitrate > 200000) {
     return { success: false, message: 'AI recommendation has invalid recording bitrate.' };
@@ -536,6 +549,14 @@ export function validateAIRecommendation(value: unknown): ValidationResult<Omit<
   if (!isNonEmptyString(recommendation.recording_format) || !isNonEmptyString(recommendation.recording_quality)) {
     return { success: false, message: 'AI recommendation has invalid recording settings.' };
   }
+  const recordingFormat = recommendation.recording_format.trim().toLowerCase();
+  const recordingQuality = recommendation.recording_quality.trim().toLowerCase();
+  if (!recommendationRecordingFormatOptions.includes(recordingFormat)) {
+    return { success: false, message: 'AI recommendation has unsupported recording format.' };
+  }
+  if (!recommendationRecordingQualityOptions.includes(recordingQuality)) {
+    return { success: false, message: 'AI recommendation has unsupported recording quality.' };
+  }
 
   return {
     success: true,
@@ -545,13 +566,13 @@ export function validateAIRecommendation(value: unknown): ValidationResult<Omit<
         resolution: recommendation.resolution.trim(),
         recording_resolution: recordingResolution.trim(),
         fps: Math.round(recommendation.fps),
-        encoder: recommendation.encoder.trim().toLowerCase(),
+        encoder,
         bitrate: Math.round(recommendation.bitrate),
-        recording_encoder: recordingEncoder.trim().toLowerCase(),
+        recording_encoder: normalizedRecordingEncoder,
         recording_bitrate: Math.round(recordingBitrate),
         audio_bitrate: Math.round(recommendation.audio_bitrate),
-        recording_format: recommendation.recording_format.trim().toLowerCase(),
-        recording_quality: recommendation.recording_quality.trim().toLowerCase(),
+        recording_format: recordingFormat,
+        recording_quality: recordingQuality,
       },
       reasoning: isNonEmptyString(value.reasoning) ? value.reasoning : 'No reasoning was provided.',
     },

@@ -17,6 +17,7 @@
 - **Depends on**: none
 - **Category**: security
 - **Planned at**: commit `ceb1be2`, 2026-07-16
+- **Implemented**: working tree on `main`, 2026-07-16
 
 ## Why this matters
 
@@ -160,12 +161,12 @@ Retain current numeric clamps and the user-visible review step.
 
 ## Done criteria
 
-- [ ] No hostname trust decision uses `includes` or unanchored substring matching.
-- [ ] Score alone never admits a source.
-- [ ] Search content and counts are bounded before prompting.
-- [ ] Only backend-selected trusted HTTPS URLs are returned as sources.
-- [ ] AI output cannot introduce unsupported encoder/format/quality strings.
-- [ ] All focused and full verification gates pass.
+- [x] No hostname trust decision uses `includes` or unanchored substring matching.
+- [x] Score alone never admits a source.
+- [x] Search content and counts are bounded before prompting.
+- [x] Only backend-selected trusted HTTPS URLs are returned as sources.
+- [x] AI output cannot introduce unsupported encoder/format/quality strings.
+- [x] All focused and full verification gates pass.
 
 ## STOP conditions
 

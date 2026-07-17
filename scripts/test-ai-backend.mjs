@@ -6,7 +6,7 @@ async function post(pathname, body) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-OBSREC-Install-Id': 'backend-smoke-test',
+      'X-OBSREC-Install-Id': '123e4567-e89b-42d3-a456-426614174000',
     },
     body: JSON.stringify(body),
   });

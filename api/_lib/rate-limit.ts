@@ -1,8 +1,13 @@
+import { isIP } from 'node:net';
 import type { ApiRequest } from './http';
 import { getAIProvider } from './ai-provider';
 import { getClientIp, getHeader } from './http';
 
-const dailyLimit = Number(process.env.OBSREC_AI_DAILY_LIMIT ?? 20);
+const DEFAULT_DAILY_LIMIT = 20;
+const MAX_DAILY_LIMIT = 1000;
+const MISSING_INSTALL_ID = 'missing-install-id';
+const UNKNOWN_IP = 'unknown';
+const RANDOM_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const memoryHits = new Map<string, { count: number; resetAt: number }>();
 
 type RateLimitResult =
@@ -19,15 +24,49 @@ function secondsUntilTomorrow(date = new Date()): number {
   return Math.max(1, Math.ceil((tomorrow.getTime() - date.getTime()) / 1000));
 }
 
-async function incrementWithUpstash(key: string, ttlSeconds: number): Promise<number | null> {
+export function parseDailyLimit(value: string | undefined): number {
+  if (!value?.trim()) return DEFAULT_DAILY_LIMIT;
+
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > MAX_DAILY_LIMIT) {
+    return DEFAULT_DAILY_LIMIT;
+  }
+
+  return parsed;
+}
+
+function normalizeInstallId(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  return RANDOM_UUID_PATTERN.test(normalized) ? normalized : MISSING_INSTALL_ID;
+}
+
+function normalizeClientIp(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (normalized.length > 64 || isIP(normalized) === 0) return UNKNOWN_IP;
+  return normalized;
+}
+
+function getUpstashConfig(): { url: string; token: string } | null {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
+  if (!url?.trim() || !token?.trim()) return null;
+  return { url: url.trim(), token: token.trim() };
+}
 
-  const response = await fetch(`${url.replace(/\/+$/, '')}/pipeline`, {
+function canUseMemoryRateLimit(): boolean {
+  const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+  return !isProduction && process.env.OBSREC_ALLOW_MEMORY_RATE_LIMIT?.trim().toLowerCase() === 'true';
+}
+
+async function incrementWithUpstash(
+  key: string,
+  ttlSeconds: number,
+  config: { url: string; token: string },
+): Promise<number> {
+  const response = await fetch(`${config.url.replace(/\/+$/, '')}/pipeline`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${config.token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify([
@@ -40,8 +79,15 @@ async function incrementWithUpstash(key: string, ttlSeconds: number): Promise<nu
     throw new Error('Rate limit storage is unavailable.');
   }
 
-  const payload = await response.json() as [{ result?: number }, { result?: number }];
-  const count = Number(payload[0]?.result ?? 0);
+  const payload = await response.json() as unknown;
+  if (!Array.isArray(payload)) {
+    throw new Error('Rate limit storage returned an invalid response.');
+  }
+
+  const count = Number((payload[0] as { result?: unknown } | undefined)?.result);
+  if (!Number.isSafeInteger(count) || count < 1) {
+    throw new Error('Rate limit storage returned an invalid count.');
+  }
 
   return count;
 }
@@ -59,9 +105,10 @@ async function incrementMemory(key: string, ttlSeconds: number): Promise<number>
 }
 
 async function increment(key: string, ttlSeconds: number): Promise<number> {
-  const upstashCount = await incrementWithUpstash(key, ttlSeconds);
-  if (upstashCount !== null) return upstashCount;
-  return incrementMemory(key, ttlSeconds);
+  const upstash = getUpstashConfig();
+  if (upstash) return incrementWithUpstash(key, ttlSeconds, upstash);
+  if (canUseMemoryRateLimit()) return incrementMemory(key, ttlSeconds);
+  throw new Error('Distributed rate limit storage is required.');
 }
 
 export async function checkRateLimit(request: ApiRequest): Promise<RateLimitResult> {
@@ -69,8 +116,9 @@ export async function checkRateLimit(request: ApiRequest): Promise<RateLimitResu
     return { allowed: true, remaining: Number.MAX_SAFE_INTEGER };
   }
 
-  const installId = getHeader(request, 'x-obsrec-install-id').trim() || 'missing-install-id';
-  const ip = getClientIp(request);
+  const dailyLimit = parseDailyLimit(process.env.OBSREC_AI_DAILY_LIMIT);
+  const installId = normalizeInstallId(getHeader(request, 'x-obsrec-install-id'));
+  const ip = normalizeClientIp(getClientIp(request));
   const ttlSeconds = secondsUntilTomorrow();
   const dayKey = getDayKey();
   const keys = [

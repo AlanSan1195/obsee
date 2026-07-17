@@ -18,6 +18,11 @@ import {
   validateSceneName,
   validateSetCameraLayout,
 } from './validation';
+import {
+  recommendationEncoderOptions,
+  recommendationRecordingFormatOptions,
+  recommendationRecordingQualityOptions,
+} from './recommendationOptions';
 
 const validAudioConfig = {
   inputName: 'Mic/Aux',
@@ -335,6 +340,52 @@ describe('validateAIRecommendation', () => {
         reasoning: 'No reasoning was provided.',
       },
     });
+  });
+
+  it.each(recommendationEncoderOptions)('acepta el encoder soportado %s', (encoder) => {
+    expect(validateAIRecommendation({
+      ...validRecommendation,
+      recommendations: {
+        ...validRecommendation.recommendations,
+        encoder,
+        recording_encoder: encoder,
+      },
+    }).success).toBe(true);
+  });
+
+  it.each(recommendationRecordingFormatOptions)('acepta el formato soportado %s', (recordingFormat) => {
+    expect(validateAIRecommendation({
+      ...validRecommendation,
+      recommendations: {
+        ...validRecommendation.recommendations,
+        recording_format: recordingFormat,
+      },
+    }).success).toBe(true);
+  });
+
+  it.each(recommendationRecordingQualityOptions)('acepta la calidad soportada %s', (recordingQuality) => {
+    expect(validateAIRecommendation({
+      ...validRecommendation,
+      recommendations: {
+        ...validRecommendation.recommendations,
+        recording_quality: recordingQuality,
+      },
+    }).success).toBe(true);
+  });
+
+  it.each([
+    ['encoder', 'custom encoder'],
+    ['recording_encoder', 'custom recording encoder'],
+    ['recording_format', 'custom container'],
+    ['recording_quality', 'custom quality'],
+  ])('rechaza el valor no soportado de %s', (field, value) => {
+    expect(validateAIRecommendation({
+      ...validRecommendation,
+      recommendations: {
+        ...validRecommendation.recommendations,
+        [field]: value,
+      },
+    }).success).toBe(false);
   });
 });
 

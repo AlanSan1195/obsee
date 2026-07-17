@@ -1,6 +1,6 @@
 import { getRecommendationFromGroq } from './_lib/groq';
 import type { ApiRequest, ApiResponse } from './_lib/http';
-import { readBody, sendJson } from './_lib/http';
+import { readBody, requireJsonPost, sendJson } from './_lib/http';
 import { checkRateLimit } from './_lib/rate-limit';
 import { validateAIRecommendation, validateAIRecommendationRequest } from '../src/shared/validation';
 import { getPreferredEncoder, getPreferredRecordingEncoder, getRecordingBitrate } from '../src/shared/localRecommendation';
@@ -8,8 +8,9 @@ import { getPreferredEncoder, getPreferredRecordingEncoder, getRecordingBitrate 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   response.setHeader('Cache-Control', 'no-store');
 
-  if (request.method !== 'POST') {
-    return sendJson(response, 405, { message: 'Method not allowed.' });
+  const boundary = requireJsonPost(request);
+  if (!boundary.allowed) {
+    return sendJson(response, boundary.status, { message: boundary.message });
   }
 
   const rateLimit = await checkRateLimit(request);

@@ -16,6 +16,7 @@
 - **Depends on**: none
 - **Category**: security
 - **Planned at**: commit `ceb1be2`, 2026-07-16
+- **Implemented**: working tree on `main`, 2026-07-16
 
 ## Why this matters
 
@@ -140,12 +141,12 @@ Create `api/_lib/http.test.ts` covering:
 
 ## Done criteria
 
-- [ ] All five endpoints share the same guard before any costly work.
-- [ ] Cross-site `text/plain` requests receive 415 without rate-limit/provider calls.
-- [ ] Unapproved browser origins receive 403.
-- [ ] No wildcard/reflected CORS header exists.
-- [ ] Local, canonical production, configured preview, and no-Origin CLI cases are covered.
-- [ ] Full test/typecheck/lint baseline passes.
+- [x] All five endpoints share the same guard before any costly work.
+- [x] Cross-site `text/plain` requests receive 415 without rate-limit/provider calls.
+- [x] Unapproved browser origins receive 403.
+- [x] No wildcard/reflected CORS header exists.
+- [x] Local, canonical production, configured preview, and no-Origin CLI cases are covered.
+- [x] Full test/typecheck/lint baseline passes.
 
 ## STOP conditions
 

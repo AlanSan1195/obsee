@@ -1,6 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store';
 import { getLocalRecommendationExplanation, isRecommendationExplanationConsistent } from '../../shared/localRecommendation';
+import {
+  recommendationEncoderOptions as encoderOptions,
+  recommendationRecordingFormatOptions as recordingFormatOptions,
+  recommendationRecordingQualityOptions as recordingQualityOptions,
+} from '../../shared/recommendationOptions';
 import { appAPI } from '../lib/app-api';
 import type { AIRecommendation, AIRecommendationField, AIRecommendationSettings } from '../../shared/types';
 import { InlineEmphasis } from './InlineEmphasis';
@@ -30,10 +35,7 @@ const recommendationFields: AIRecommendationField[] = [
 ];
 const resolutionOptions = ['1280x720', '1920x1080', '2560x1440', '3840x2160'];
 const fpsOptions = [30, 60, 120];
-const encoderOptions = ['apple vt h264', 'apple vt hevc', 'nvenc', 'x264', 'qsv', 'amd'];
 const audioBitrateOptions = [160, 192, 256, 320];
-const recordingFormatOptions = ['mkv', 'mp4', 'mov'];
-const recordingQualityOptions = ['stream', 'medium', 'high', 'lossless'];
 
 function getExplanationConcepts(
   settings: RecommendationSettings,

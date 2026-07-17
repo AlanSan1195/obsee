@@ -32,6 +32,12 @@ Ollama debe estar ejecutándose en `http://127.0.0.1:11434`. `pnpm dev` usa `.en
 
 Para probar deliberadamente contra la API desplegada usa `pnpm run dev:remote`; ese comando sí consume la cuota real. Las claves (`GROQ_API_KEY`, `TAVILY_API_KEY`, rate limits) viven **solo** en las variables de entorno de Vercel — el frontend no contiene secretos.
 
+### Seguridad de la API desplegada
+
+Los endpoints de IA aceptan únicamente `POST` con `Content-Type: application/json`. Los navegadores también deben enviar un `Origin` permitido. `https://obsee.vercel.app`, `http://localhost:5173` y `http://127.0.0.1:5173` están incluidos; previews o dominios propios se agregan como orígenes exactos, separados por comas, en `OBSREC_ALLOWED_ORIGINS`. No se admiten comodines.
+
+Toda implementación de producción con Groq/Tavily requiere `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`. Si cualquiera falta o Upstash no responde, la IA remota falla de forma segura y la aplicación utiliza su recomendación local. `OBSREC_ALLOW_MEMORY_RATE_LIMIT=true` sólo habilita un contador temporal durante desarrollo local; Vercel y `NODE_ENV=production` siempre ignoran esa opción. `OBSREC_AI_DAILY_LIMIT` acepta enteros de 1 a 1000 y vuelve al valor seguro 20 si la configuración no es válida.
+
 ## Arquitectura y decisiones
 
 ```text

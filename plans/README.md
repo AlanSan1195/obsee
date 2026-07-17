@@ -18,9 +18,9 @@ unless a reviewing advisor maintains the index.
 | 005 | Make the local video ceiling encoder-aware | P2 | M | 004 | DONE |
 | 006 | Keep local credentials private and untrackable | P1 | S | — | BLOCKED — local `.env` is 0600, but broad ignore rules, automated checks, and documentation remain unimplemented |
 | 007 | Remove all high-severity dependency advisories | P1 | M | — | DONE — merged into `main` at commit `690c8c0`; last successful audit reported only one low advisory |
-| 008 | Reject cross-site and non-JSON AI requests | P1 | M | — | TODO |
-| 009 | Fail closed without distributed rate limiting | P1 | M | — | TODO |
-| 010 | Prevent untrusted web evidence from steering OBS | P1 | M | — | TODO |
+| 008 | Reject cross-site and non-JSON AI requests | P1 | M | — | DONE — shared request guard covers all five quota-bearing endpoints; included in the passing 191-test suite |
+| 009 | Fail closed without distributed rate limiting | P1 | M | — | DONE — production requires Upstash; local memory fallback is explicit and tested |
+| 010 | Prevent untrusted web evidence from steering OBS | P1 | M | — | DONE — exact host policy, bounded prompt evidence, verified source provenance, and OBS output allowlists; 191 tests pass |
 | 011 | Enforce a strict header-based production CSP | P2 | M | 010 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
@@ -36,23 +36,23 @@ REJECTED (with one-line rationale).
   tracked prevention work is still pending: broad `.env*` ignore rules, a
   secret-hygiene check, and setup/revocation documentation.
 - 007 is independent but should land before enabling its scheduled audit gate.
-- 008 and 009 address different layers of API abuse protection and may be
-  implemented in parallel if separate branches avoid conflicts.
-- 010 must preserve the current user review step and local fallbacks while
-  tightening web evidence and AI output validation.
-- 011 follows 010 so the browser policy is hardened after external source URLs
-  and prompt provenance are deterministic.
+- 008 and 009 now protect the request boundary and shared quota layer together.
+- 010 preserves the current user review step and local fallbacks while enforcing
+  exact web-source provenance and semantic AI output validation.
+- 011 is now unblocked because external source URLs and prompt provenance are
+  deterministic.
 
 ## Reconciliation on 2026-07-16
 
 - Plans 001–005 remain present in the implementation and their focused tests
-  are part of the passing 130-test suite.
+  are part of the passing 191-test suite.
 - Plan 006 has only its local file-permission action applied; it is not complete.
 - Plan 007 is merged into `main`. The dependency pins and security workflow are
   present. A live audit rerun was unavailable during this reconciliation because
   the npm registry could not be resolved; the immediately preceding successful
   audit reported one low advisory and no high advisories.
-- Plans 008–011 remain reproducible in the current source and are still TODO.
+- Plans 008–010 were completed after this reconciliation; plan 011 remains
+  reproducible in the current source and is still TODO.
 
 ## Deferred findings
 

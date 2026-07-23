@@ -204,6 +204,33 @@ describe('getLocalRecommendation', () => {
     expect(streamOnly.recording_encoder).toBe(streamOnly.encoder);
     expect(streamOnly.recording_bitrate).toBe(streamOnly.bitrate);
   });
+
+  it('respeta stream 1080p y grabacion 4K solicitados en hardware capaz', () => {
+    const result = getLocalRecommendation(makeRequest({
+      platform: 'youtube',
+      goal: {
+        description: 'Transmitir a 1080p y grabar a 4K60.',
+        streamResolution: '1920x1080',
+        recordingResolution: '3840x2160',
+        fps: 60,
+      },
+      systemInfo: {
+        cpu: { model: 'Apple M4', cores: 10 },
+        gpu: { vendor: 'Apple', model: 'Apple M4', hasNvenc: false },
+        ram: { total: 16 },
+      },
+    })).recommendations;
+
+    expect(result).toMatchObject({
+      canvas_resolution: '3840x2160',
+      resolution: '1920x1080',
+      recording_resolution: '3840x2160',
+      fps: 60,
+      bitrate: 9000,
+      recording_encoder: 'apple vt hevc',
+      recording_bitrate: 40000,
+    });
+  });
 });
 
 describe('getLocalRecommendationExplanation', () => {

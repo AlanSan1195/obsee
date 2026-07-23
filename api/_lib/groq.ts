@@ -69,7 +69,7 @@ async function searchWeb(
 }
 
 export async function getRecommendationFromGroq(request: AIRecommendationRequest): Promise<unknown> {
-  const { systemInfo, mode, platform, currentSettings } = request;
+  const { systemInfo, mode, platform, currentSettings, goal } = request;
   const baselineSection = currentSettings
     ? `
 Configuracion que OBS ya tiene (definida en el asistente inicial de OBS segun el hardware y la red del usuario; usala como base y solo cambiala si hay una mejora clara):
@@ -79,6 +79,19 @@ Configuracion que OBS ya tiene (definida en el asistente inicial de OBS segun el
 - Bitrate de video: ${currentSettings.bitrate} kbps
 - Calidad de grabacion: ${currentSettings.recordingQuality}
 - Servicio de streaming configurado: ${currentSettings.hasStreamService ? 'Si' : 'No'}
+`
+    : '';
+  const goalSection = goal
+    ? `
+Objetivo descrito por el usuario:
+- Peticion original: ${goal.description}
+- Fuente: ${goal.source ?? 'no indicada'}
+- Stream deseado: ${goal.streamResolution ?? 'dejar que OBSREC decida'}
+- Grabacion deseada: ${goal.recordingResolution ?? 'dejar que OBSREC decida'}
+- FPS deseados: ${goal.fps ?? 'dejar que OBSREC decida'}
+- Contexto de dispositivos: ${goal.deviceNotes ?? 'no indicado'}
+
+Trata estas preferencias como el resultado deseado, pero reduce valores que el hardware no pueda sostener y explica cualquier limite.
 `
     : '';
   const prompt = `Eres un experto en configuracion de OBS para streaming y grabacion.
@@ -94,6 +107,7 @@ Hardware disponible:
 - RAM: ${systemInfo.ram.total}GB
 - OS: ${systemInfo.os.distro} ${systemInfo.os.release}
 - Hardware NVENC disponible: ${systemInfo.gpu.hasNvenc ? 'Si' : 'No'}
+${goalSection}
 ${baselineSection}
 Campos de resolucion:
 - "canvas_resolution": lienzo base donde se acomodan las fuentes.
@@ -333,7 +347,11 @@ function buildConsoleContext(request: ConsoleProfileRequest): string {
 Capturadora detectada: "${request.captureCard ?? 'desconocida'}".
 Monitor detectado: "${request.monitor ?? 'desconocido'}"${request.monitorRefreshRate ? ` a ${request.monitorRefreshRate}Hz` : ''}.
 PC que corre OBS: CPU ${c.model} (${c.cores} nucleos), GPU ${g.model} (vendor ${g.vendor}, NVENC ${g.hasNvenc ? 'si' : 'no'}), ${request.systemInfo.ram.total}GB RAM, OS ${request.os ?? request.systemInfo.os.distro}.
-Uso: ${request.mode} en ${request.platform}.${realCaps}`;
+Uso: ${request.mode} en ${request.platform}.
+Objetivo del usuario: ${request.goal?.description ?? 'No especificado'}.
+Stream deseado: ${request.goal?.streamResolution ?? 'decidir segun plataforma'}.
+Grabacion deseada: ${request.goal?.recordingResolution ?? 'decidir segun hardware'}.
+FPS deseados: ${request.goal?.fps ?? 'decidir segun hardware'}.${realCaps}`;
 }
 
 // Hibrido: intenta busqueda web via Tavily si TAVILY_API_KEY esta configurada.

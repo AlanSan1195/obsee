@@ -3,7 +3,12 @@ import type { ApiRequest, ApiResponse } from './_lib/http';
 import { readBody, requireJsonPost, sendJson } from './_lib/http';
 import { checkRateLimit } from './_lib/rate-limit';
 import { validateAIRecommendation, validateAIRecommendationRequest } from '../src/shared/validation';
-import { getPreferredEncoder, getPreferredRecordingEncoder, getRecordingBitrate } from '../src/shared/localRecommendation';
+import {
+  getPreferredEncoder,
+  getPreferredRecordingEncoder,
+  getRecordingBitrate,
+  getStreamBitrate,
+} from '../src/shared/localRecommendation';
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   response.setHeader('Cache-Control', 'no-store');
@@ -39,6 +44,11 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const normalizedRecommendations = {
       ...recommendation.value.recommendations,
       encoder: preferredStreamEncoder,
+      bitrate: getStreamBitrate(
+        validation.value.platform,
+        recommendation.value.recommendations.resolution,
+        recommendation.value.recommendations.fps,
+      ),
       recording_encoder: preferredRecordingEncoder,
       recording_bitrate: wantsRecording
         ? getRecordingBitrate(

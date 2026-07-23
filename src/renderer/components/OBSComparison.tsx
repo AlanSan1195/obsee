@@ -10,13 +10,14 @@ export type ComparisonRow = {
   current: string;
   recommended: string;
   type?: 'encoder' | 'recordingQuality';
+  applyMethod?: 'automatic' | 'manual';
 };
 
 function normalize(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function normalizeEncoder(value: string): string {
+export function normalizeEncoder(value: string): string {
   const normalized = normalize(value).replace(/[_-]/g, ' ');
 
   if ((normalized.includes('apple') || normalized.includes('videotoolbox')) && (normalized.includes('hevc') || normalized.includes('h265') || normalized.includes('h.265'))) return 'apple_hevc';
@@ -27,6 +28,25 @@ function normalizeEncoder(value: string): string {
   if (normalized.includes('x264')) return 'x264';
 
   return normalized;
+}
+
+export function formatEncoderName(value: string): string {
+  switch (normalizeEncoder(value)) {
+    case 'apple_h264':
+      return 'Apple VT H.264 (hardware)';
+    case 'apple_hevc':
+      return 'Apple VT HEVC (hardware)';
+    case 'nvenc':
+      return 'NVIDIA NVENC (hardware)';
+    case 'qsv':
+      return 'Intel Quick Sync (hardware)';
+    case 'amd':
+      return 'AMD AMF (hardware)';
+    case 'x264':
+      return 'x264 (CPU)';
+    default:
+      return value;
+  }
 }
 
 function normalizeRecordingQuality(value: string): string {
@@ -42,7 +62,7 @@ function normalizeRecordingQuality(value: string): string {
 
 export function isSameValue(row: ComparisonRow): boolean {
   const { current, recommended } = row;
-  if (current === '0' || current === 'Desconocido') return false;
+  if (current === '0' || current === 'Desconocido' || current === 'No disponible por WebSocket') return false;
 
   if (row.type === 'encoder') {
     return normalizeEncoder(current) === normalizeEncoder(recommended);
@@ -88,8 +108,9 @@ export function buildComparisonRows(
     },
     {
       label: 'Bitrate del stream',
-      current: String(snapshot.bitrate),
+      current: snapshot.bitrate > 0 ? String(snapshot.bitrate) : 'No disponible por WebSocket',
       recommended: String(recommendations.bitrate),
+      applyMethod: snapshot.outputMode === 'Advanced' ? 'manual' : 'automatic',
     },
     {
       label: 'Encoder de grabacion',
@@ -99,8 +120,9 @@ export function buildComparisonRows(
     },
     {
       label: 'Bitrate de grabacion',
-      current: 'Desconocido',
+      current: snapshot.outputMode === 'Advanced' ? 'No disponible por WebSocket' : 'No independiente',
       recommended: String(recommendations.recording_bitrate),
+      applyMethod: 'manual',
     },
     {
       label: 'Bitrate de audio',
@@ -117,6 +139,7 @@ export function buildComparisonRows(
       current: snapshot.recordingQuality,
       recommended: recommendations.recording_quality,
       type: 'recordingQuality',
+      applyMethod: snapshot.outputMode === 'Advanced' ? 'manual' : 'automatic',
     },
   ];
 }
@@ -146,6 +169,8 @@ export function OBSComparison() {
   const rows = buildComparisonRows(obsSettingsSnapshot, recommendations);
 
   const changeCount = rows.filter((row) => !isSameValue(row)).length;
+  const manualCount = rows.filter((row) => !isSameValue(row) && row.applyMethod === 'manual').length;
+  const automaticCount = changeCount - manualCount;
   const readableBackupDate = backupDate ? new Date(backupDate).toLocaleString() : '';
 
   const handleRestore = async () => {
@@ -184,7 +209,8 @@ export function OBSComparison() {
                 : 'border-warning/40 bg-warning/10 text-warning'
             }`}
           >
-            {changeCount} cambio{changeCount === 1 ? '' : 's'}
+            {automaticCount} cambio{automaticCount === 1 ? '' : 's'}
+            {manualCount > 0 ? ` · ${manualCount} manual${manualCount === 1 ? '' : 'es'}` : ''}
           </span>
         </>
       }
@@ -198,19 +224,28 @@ export function OBSComparison() {
         </div>
         {rows.map((row) => {
           const same = isSameValue(row);
+          const manual = !same && row.applyMethod === 'manual';
           return (
             <div
               key={row.label}
               className="grid grid-cols-[1fr_1fr_1fr_104px] items-center border-t border-border px-4 py-3 text-sm transition-colors hover:bg-surface-hover/70"
             >
               <span className="font-medium text-text">{row.label}</span>
-              <span className="text-text-muted">{row.current || 'Desconocido'}</span>
-              <span className="text-text">{row.recommended}</span>
+              <span className="text-text-muted">
+                {row.type === 'encoder' ? formatEncoderName(row.current) : row.current || 'Desconocido'}
+              </span>
+              <span className="text-text">
+                {row.type === 'encoder' ? formatEncoderName(row.recommended) : row.recommended}
+              </span>
               <span>
                 {same ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-secondary/30 bg-secondary/10 px-2.5 py-0.5 text-xs font-semibold text-secondary">
                     <IconCheck className="h-3 w-3" />
                     Mantener
+                  </span>
+                ) : manual ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-warning/35 bg-warning/10 px-2.5 py-0.5 text-xs font-semibold text-warning">
+                    Manual
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-warning/35 bg-warning/10 px-2.5 py-0.5 text-xs font-semibold text-warning">

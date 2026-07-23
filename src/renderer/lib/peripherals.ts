@@ -3,15 +3,9 @@ import type { PeripheralsSnapshot } from '../../shared/types';
 const CAPTURE_KEYWORDS = ['capture', 'hdmi', 'elgato', 'avermedia', 'ripsaw', 'ugreen', 'macrosilicon', 'cam link', 'live gamer', 'game capture', 'video grabber'];
 
 export async function getPeripherals(): Promise<PeripheralsSnapshot> {
-  // Sin permiso de camara, enumerateDevices devuelve labels vacios:
-  // pedimos acceso una vez y soltamos el stream de inmediato.
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    stream.getTracks().forEach((track) => track.stop());
-  } catch {
-    // permiso denegado o sin camara: seguimos con lo que haya
-  }
-
+  // No se pide permiso de camara automaticamente. Si el navegador ya conoce
+  // los labels se aprovechan; si no, el objetivo conversacional conserva el
+  // nombre escrito por el usuario sin interrumpir el analisis con un prompt.
   let devices: MediaDeviceInfo[];
   try {
     devices = await navigator.mediaDevices.enumerateDevices();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildComparisonRows, isSameValue } from './OBSComparison';
+import { buildComparisonRows, formatEncoderName, isSameValue } from './OBSComparison';
 import type { AIRecommendation, OBSSettingsSnapshot } from '../../shared/types';
 
 const snapshot: OBSSettingsSnapshot = {
@@ -73,5 +73,41 @@ describe('buildComparisonRows', () => {
     expect(rows.find((row) => row.label === 'Salida maestra / grabacion')?.recommended).toBe('3840x2160');
     expect(rows.find((row) => row.label === 'Encoder de grabacion')?.recommended).toBe('nvenc');
     expect(rows.find((row) => row.label === 'Bitrate de grabacion')?.recommended).toBe('60000');
+  });
+
+  it('no confunde el bitrate simple con el bitrate avanzado no expuesto por OBS', () => {
+    const rows = buildComparisonRows({
+      ...snapshot,
+      outputMode: 'Advanced',
+      encoder: 'com.apple.videotoolbox.videoencoder.ave.avc',
+      bitrate: 0,
+      audioBitrate: 320,
+      advancedOutput: {
+        streamEncoder: 'com.apple.videotoolbox.videoencoder.ave.avc',
+        recordingEncoder: 'com.apple.videotoolbox.videoencoder.ave.hevc',
+        streamRescaleResolution: '1920x1080',
+        recordingRescaleResolution: '1920x1080',
+        streamRescaleFilter: '0',
+        recordingRescaleFilter: '0',
+        recordingFormat: 'mkv',
+      },
+    }, recommendations);
+
+    expect(rows.find((row) => row.label === 'Bitrate del stream')).toMatchObject({
+      current: 'No disponible por WebSocket',
+      applyMethod: 'manual',
+    });
+    expect(rows.find((row) => row.label === 'Bitrate de grabacion')).toMatchObject({
+      current: 'No disponible por WebSocket',
+      applyMethod: 'manual',
+    });
+    expect(rows.find((row) => row.label === 'Bitrate de audio')?.current).toBe('320');
+  });
+});
+
+describe('formatEncoderName', () => {
+  it('presenta los identificadores internos de Apple como nombres legibles', () => {
+    expect(formatEncoderName('com.apple.videotoolbox.videoencoder.ave.avc')).toBe('Apple VT H.264 (hardware)');
+    expect(formatEncoderName('com.apple.videotoolbox.videoencoder.ave.hevc')).toBe('Apple VT HEVC (hardware)');
   });
 });

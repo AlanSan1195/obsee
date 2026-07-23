@@ -389,8 +389,39 @@ export function validateAIRecommendationRequest(value: unknown): ValidationResul
       systemInfo: systemInfo.value,
       mode: value.mode as OBSMode,
       platform: value.platform as OBSPlatform,
+      goal: parseOptionalGoal(value.goal),
       currentSettings: parseOptionalObsBaseline(value.currentSettings),
     },
+  };
+}
+
+function parseOptionalGoal(value: unknown): AIRecommendationRequest['goal'] {
+  if (!isRecord(value) || !isNonEmptyString(value.description)) return undefined;
+
+  const streamResolution = isNonEmptyString(value.streamResolution)
+    && parseResolution(value.streamResolution).success
+    ? value.streamResolution.trim()
+    : undefined;
+  const recordingResolution = isNonEmptyString(value.recordingResolution)
+    && parseResolution(value.recordingResolution).success
+    ? value.recordingResolution.trim()
+    : undefined;
+  const source = value.source === 'console' || value.source === 'computer'
+    ? value.source
+    : undefined;
+  const fps = isPositiveNumber(value.fps) && value.fps <= 240
+    ? Math.round(value.fps)
+    : undefined;
+
+  return {
+    description: value.description.trim().slice(0, 2000),
+    streamResolution,
+    recordingResolution,
+    fps,
+    source,
+    deviceNotes: isNonEmptyString(value.deviceNotes)
+      ? value.deviceNotes.trim().slice(0, 1000)
+      : undefined,
   };
 }
 
@@ -900,6 +931,7 @@ export function validateConsoleProfileRequest(value: unknown): ValidationResult<
       console: value.console as ConsoleModel,
       platform: value.platform as OBSPlatform,
       mode: value.mode as OBSMode,
+      goal: parseOptionalGoal(value.goal),
       systemInfo: systemInfo.value,
       captureCard: isNonEmptyString(value.captureCard) ? value.captureCard.trim().slice(0, 128) : undefined,
       monitor: isNonEmptyString(value.monitor) ? value.monitor.trim().slice(0, 128) : undefined,

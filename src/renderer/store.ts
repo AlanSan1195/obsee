@@ -35,7 +35,7 @@ interface AppState {
   setMode: (mode: OBSMode) => void;
   setPlatform: (platform: OBSPlatform) => void;
   setSystemInfo: (info: SystemInfo) => void;
-  setRecommendation: (rec: AIRecommendation) => void;
+  setRecommendation: (rec: AIRecommendation | null) => void;
   setIsAnalyzing: (value: boolean) => void;
   setIsApplying: (value: boolean) => void;
   setObsConnectionSettings: (settings: Partial<OBSConnectionSettings>) => void;

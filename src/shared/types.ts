@@ -231,8 +231,18 @@ export interface AIRecommendationRequest {
   systemInfo: SystemInfo;
   mode: OBSMode;
   platform: OBSPlatform;
+  goal?: OBSGoalPreferences;
   // Opcional para mantener compatibilidad con backends anteriores.
   currentSettings?: ObsBaselineSettings;
+}
+
+export interface OBSGoalPreferences {
+  description: string;
+  streamResolution?: string;
+  recordingResolution?: string;
+  fps?: number;
+  source?: 'computer' | 'console';
+  deviceNotes?: string;
 }
 
 export type AIRecommendationSettings = {
@@ -315,6 +325,7 @@ export interface ConsoleProfileRequest {
   captureMaxFps?: number;
   platform: OBSPlatform;
   mode: OBSMode;
+  goal?: OBSGoalPreferences;
   // Hardware de la PC que corre OBS (para elegir encoder/bitrate).
   systemInfo: SystemInfo;
   os?: string;

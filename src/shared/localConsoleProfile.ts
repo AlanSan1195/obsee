@@ -4,6 +4,7 @@ import {
   getPreferredEncoder,
   getPreferredRecordingEncoder,
   getRecordingBitrate,
+  getStreamBitrate,
 } from './localRecommendation';
 import { parseResolution, validateConsoleProfileResponse } from './validation';
 
@@ -57,10 +58,13 @@ export function normalizeConsoleProfileForRequest(
     consoleCaps.fps,
     request.captureMaxFps ?? response.profile.captureFps,
   );
-  const streamResolution = minResolution(response.recommendations.resolution, verifiedCaptureResolution);
+  const streamResolution = minResolution(
+    request.goal?.streamResolution ?? response.recommendations.resolution,
+    verifiedCaptureResolution,
+  );
   const recordingResolution = request.mode === 'stream_only'
     ? streamResolution
-    : verifiedCaptureResolution;
+    : minResolution(request.goal?.recordingResolution ?? verifiedCaptureResolution, verifiedCaptureResolution);
   const preferredEncoder = getPreferredEncoder(request.systemInfo);
   const wantsRecording = request.mode !== 'stream_only';
   const preferredRecordingEncoder = wantsRecording
@@ -81,7 +85,10 @@ export function normalizeConsoleProfileForRequest(
       ? `OBS verifico que la capturadora fija el techo de captura en ${verifiedCaptureResolution} a ${verifiedCaptureFps}fps. El monitor solo afecta el passthrough y no reduce la grabacion de OBS.`
       : `OBS verifico captura hasta ${verifiedCaptureResolution} a ${verifiedCaptureFps}fps sin un limite inferior al de la consola. El monitor solo afecta el passthrough.`
     : response.profile.bottleneck;
-  const finalFps = Math.min(response.recommendations.fps, verifiedCaptureFps);
+  const finalFps = Math.min(
+    request.goal?.fps ?? response.recommendations.fps,
+    verifiedCaptureFps,
+  );
   const captureMatch = hasVerifiedCaptureCaps
     ? `La **${consoleInfo.name}** y la capturadora hacen match en **${verifiedCaptureResolution} a ${verifiedCaptureFps} FPS**, capacidad comprobada directamente por OBS.`
     : `La **${consoleInfo.name}** y la capturadora se ajustaron al techo seguro de **${verifiedCaptureResolution} a ${verifiedCaptureFps} FPS**.`;
@@ -131,6 +138,7 @@ export function normalizeConsoleProfileForRequest(
       recording_resolution: recordingResolution,
       fps: finalFps,
       encoder: preferredEncoder,
+      bitrate: getStreamBitrate(request.platform, streamResolution, finalFps),
       recording_encoder: preferredRecordingEncoder,
       recording_bitrate: recordingBitrate,
     },
@@ -243,17 +251,24 @@ export function getLocalConsoleProfile(request: ConsoleProfileRequest): ConsoleP
     systemInfo: request.systemInfo,
     mode: request.mode,
     platform: request.platform,
+    goal: request.goal,
   }).recommendations;
-  const streamResolution = minResolution(base.resolution, captureResolution);
+  const streamResolution = minResolution(
+    request.goal?.streamResolution ?? base.resolution,
+    captureResolution,
+  );
   const wantsRecording = request.mode !== 'stream_only';
+  const recordingResolution = wantsRecording
+    ? minResolution(request.goal?.recordingResolution ?? captureResolution, captureResolution)
+    : streamResolution;
   const recommendations = {
     ...base,
     canvas_resolution: captureResolution,
     resolution: streamResolution,
-    recording_resolution: wantsRecording ? captureResolution : streamResolution,
+    recording_resolution: recordingResolution,
     fps: Math.min(base.fps, captureFps),
     recording_bitrate: wantsRecording
-      ? getRecordingBitrate(captureResolution, Math.min(base.fps, captureFps), base.recording_encoder)
+      ? getRecordingBitrate(recordingResolution, Math.min(base.fps, captureFps), base.recording_encoder)
       : base.bitrate,
   };
 

@@ -212,6 +212,7 @@ export class OBSManager {
         { key: 'advancedStreamFilter', category: 'AdvOut', name: 'RescaleFilter' },
         { key: 'advancedRecordingFilter', category: 'AdvOut', name: 'RecRescaleFilter' },
         { key: 'advancedRecordingFormat', category: 'AdvOut', name: 'RecFormat2' },
+        { key: 'advancedAudioBitrate', category: 'AdvOut', name: 'Track1Bitrate' },
       ];
 
       await Promise.all(profileRequests.map(async (request) => {
@@ -264,8 +265,13 @@ export class OBSManager {
           encoder: outputMode === 'Advanced'
             ? profileSettings.advancedStreamEncoder || 'Unknown'
             : profileSettings.encoder || 'Unknown',
-          bitrate: getNumberSetting(profileSettings, 'bitrate'),
-          audioBitrate: getNumberSetting(profileSettings, 'audioBitrate'),
+          // OBS guarda el bitrate de video avanzado dentro de streamEncoder.json,
+          // que obs-websocket no expone. No mezclarlo con el VBitrate obsoleto
+          // de SimpleOutput: cero representa "no disponible" en la comparacion.
+          bitrate: outputMode === 'Advanced' ? 0 : getNumberSetting(profileSettings, 'bitrate'),
+          audioBitrate: outputMode === 'Advanced'
+            ? getNumberSetting(profileSettings, 'advancedAudioBitrate')
+            : getNumberSetting(profileSettings, 'audioBitrate'),
           recordingFormat: outputMode === 'Advanced'
             ? profileSettings.advancedRecordingFormat || 'Unknown'
             : profileSettings.recordingFormat2 || profileSettings.recordingFormat || 'Unknown',
@@ -453,13 +459,19 @@ export class OBSManager {
     }
   }
 
-  async configure(config: OBSConfig): Promise<{ success: boolean; message: string }> {
+  async configure(config: OBSConfig): Promise<{
+    success: boolean;
+    message: string;
+    warnings?: string[];
+    requiresManualConfirmation?: boolean;
+  }> {
     if (!this.connected) {
       return { success: false, message: 'Not connected to OBS. Please connect first.' };
     }
 
     try {
       const warnings: string[] = [];
+      let requiresManualConfirmation = false;
       const backupSnapshot = await this.getSettingsSnapshot();
       if (backupSnapshot.success && backupSnapshot.snapshot) {
         try {
@@ -516,6 +528,7 @@ export class OBSManager {
       const profileUpdates: Array<{ category: string; name: string; value: string }> = [];
 
       if (needsAdvancedOutput) {
+        requiresManualConfirmation = true;
         const streamEncoderId = getAdvancedEncoderId(config.encoder);
         const recordingEncoderId = getAdvancedEncoderId(recordingEncoder);
         const streamNeedsRescale = normalizedStreamResolution !== normalizedRecordingResolution;
@@ -549,13 +562,10 @@ export class OBSManager {
           warnings.push(`Encoder de grabacion "${recordingEncoder}" no se pudo asignar a OBS Advanced Output.`);
         }
 
-        const outputSummary = config.mode === 'stream_record'
-          ? `stream ${normalizedStreamResolution} con ${config.encoder} y grabacion ${normalizedRecordingResolution} con ${recordingEncoder}`
-          : `grabacion ${normalizedRecordingResolution} con ${recordingEncoder}`;
         const bitrateSummary = config.mode === 'stream_record'
-          ? `emision ${config.bitrate}kbps y grabacion ${recordingBitrate}kbps`
-          : `grabacion ${recordingBitrate}kbps`;
-        warnings.push(`OBS quedo en modo avanzado con perfiles separados: ${outputSummary}. Se aplicaron resoluciones y encoders. Objetivos de bitrate: ${bitrateSummary}; obs-websocket no permite escribir los controles internos de bitrate/calidad de los encoders avanzados, asi que debes confirmarlos una vez en Ajustes > Salida.`);
+          ? `stream ${config.bitrate} kbps y grabacion ${recordingBitrate} kbps`
+          : `grabacion ${recordingBitrate} kbps`;
+        warnings.push(`OBS WebSocket no permite escribir los bitrates ni la calidad interna del modo avanzado (${bitrateSummary}, calidad ${config.recordingQuality ?? 'sin especificar'}). Confirma esos valores manualmente en Ajustes > Salida.`);
       } else {
         const encoderId = getSimpleEncoderId(config.encoder);
         profileUpdates.push(
@@ -598,11 +608,20 @@ export class OBSManager {
       if (warnings.length > 0) {
         return {
           success: true,
-          message: `Configuracion aplicada en OBS con advertencias: ${warnings.join('; ')}`,
+          message: requiresManualConfirmation
+            ? `Cambios compatibles aplicados en OBS. Falta confirmar manualmente el bitrate y la calidad avanzada: ${warnings.join('; ')}`
+            : `Configuracion aplicada en OBS con advertencias: ${warnings.join('; ')}`,
+          warnings,
+          requiresManualConfirmation,
         };
       }
 
-      return { success: true, message: 'Configuracion aplicada en OBS' };
+      return {
+        success: true,
+        message: 'Configuracion aplicada en OBS',
+        warnings,
+        requiresManualConfirmation,
+      };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return { success: false, message: `No se pudo aplicar la configuracion: ${errorMessage}` };
@@ -663,6 +682,7 @@ export class OBSManager {
           { category: 'AdvOut', name: 'RescaleFilter', value: snapshot.advancedOutput.streamRescaleFilter },
           { category: 'AdvOut', name: 'RecRescaleFilter', value: snapshot.advancedOutput.recordingRescaleFilter },
           { category: 'AdvOut', name: 'RecFormat2', value: snapshot.advancedOutput.recordingFormat },
+          { category: 'AdvOut', name: 'Track1Bitrate', value: snapshot.audioBitrate > 0 ? String(snapshot.audioBitrate) : '' },
         ]
         : [
           { category: 'Output', name: 'Mode', value: 'Simple' },

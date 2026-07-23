@@ -46,6 +46,30 @@ function readResolutionDims(resolution: string): { width: number; height: number
   return { width, height };
 }
 
+function resolutionPixels(resolution: string): number {
+  const dims = readResolutionDims(resolution);
+  return dims ? dims.width * dims.height : 0;
+}
+
+function clampGoalResolution(
+  requested: string | undefined,
+  fallback: string,
+  maximum: string,
+): string {
+  if (!requested || resolutionPixels(requested) === 0) return fallback;
+  return resolutionPixels(requested) <= resolutionPixels(maximum) ? requested : maximum;
+}
+
+export function getStreamBitrate(platform: AIRecommendationRequest['platform'], resolution: string, fps: number): number {
+  const pixels = resolutionPixels(resolution);
+  const highFrameRate = fps >= 50;
+
+  if (pixels >= 3840 * 2160) return platform === 'youtube' ? (highFrameRate ? 45000 : 30000) : 8000;
+  if (pixels >= 2560 * 1440) return platform === 'youtube' ? (highFrameRate ? 18000 : 12000) : 8000;
+  if (pixels >= 1920 * 1080) return platform === 'youtube' ? (highFrameRate ? 9000 : 6000) : 6000;
+  return platform === 'youtube' ? 4500 : 3500;
+}
+
 function getHardwareVideoProfile(request: AIRecommendationRequest, encoder: string) {
   const { cpu, ram } = request.systemInfo;
   const hasHardwareEncoder = encoder !== 'x264';
@@ -105,33 +129,62 @@ export function getLocalRecommendation(request: AIRecommendationRequest): AIReco
     ? encoder
     : getPreferredRecordingEncoder(request.systemInfo);
   const videoProfile = getVideoProfile(request, encoder);
+  const hasHardwareEncoder = encoder !== 'x264';
+  const canHandleHighResolution = request.systemInfo.ram.total >= 16
+    && (hasHardwareEncoder || request.systemInfo.cpu.cores >= 12);
+  const streamMaximum = canHandleHighResolution && request.platform === 'youtube'
+    ? '3840x2160'
+    : videoProfile.resolution;
+  const recordingMaximum = canHandleHighResolution ? '3840x2160' : videoProfile.resolution;
+  const streamResolution = request.mode === 'record_only'
+    ? videoProfile.resolution
+    : clampGoalResolution(request.goal?.streamResolution, videoProfile.resolution, streamMaximum);
+  const recordingResolution = request.mode === 'stream_only'
+    ? streamResolution
+    : clampGoalResolution(request.goal?.recordingResolution, videoProfile.resolution, recordingMaximum);
+  const fps = request.goal?.fps
+    ? Math.min(request.goal.fps, canHandleHighResolution ? 60 : videoProfile.fps)
+    : videoProfile.fps;
+  const hasExplicitGoal = Boolean(
+    request.goal?.streamResolution
+    || request.goal?.recordingResolution
+    || request.goal?.fps,
+  );
+  const streamBitrate = videoProfile.usedBaseline && !hasExplicitGoal
+    ? videoProfile.bitrate
+    : getStreamBitrate(request.platform, streamResolution, fps);
   const recordingQuality = request.mode === 'stream_only' ? 'stream' : 'high';
   const recordingBitrate = request.mode === 'stream_only'
-    ? videoProfile.bitrate
-    : getRecordingBitrate(videoProfile.resolution, videoProfile.fps, recordingEncoder);
+    ? streamBitrate
+    : getRecordingBitrate(recordingResolution, fps, recordingEncoder);
+  const canvasResolution = resolutionPixels(recordingResolution) > resolutionPixels(streamResolution)
+    ? recordingResolution
+    : streamResolution;
 
   const hardwareMatch = encoder === 'x264'
     ? `El **encoder ${encoder.toUpperCase()}** usa los ${request.systemInfo.cpu.cores} nucleos del CPU porque no se detecto un encoder de video dedicado.`
     : `El **encoder ${encoder.toUpperCase()}** hace match con la GPU ${request.systemInfo.gpu.model} y codifica por hardware para quitarle carga al CPU.`;
-  const baselineMatch = videoProfile.usedBaseline
+  const baselineMatch = request.goal?.streamResolution || request.goal?.recordingResolution || request.goal?.fps
+    ? 'La salida se ajusto al objetivo que describiste, sin superar el techo seguro del hardware.'
+    : videoProfile.usedBaseline
     ? 'Se conservo la base que OBS ya habia ajustado para tu equipo y tu red.'
     : 'La resolucion y los FPS se limitaron a un nivel seguro para el hardware detectado.';
   const outputMatch = request.mode === 'stream_only'
-    ? `El **stream ${videoProfile.resolution} a ${videoProfile.fps} FPS y ${videoProfile.bitrate} kbps** equilibra nitidez, movimiento y estabilidad en ${request.platform}.`
+    ? `El **stream ${streamResolution} a ${fps} FPS y ${streamBitrate} kbps** equilibra nitidez, movimiento y estabilidad en ${request.platform}.`
     : request.mode === 'record_only'
-      ? `La **grabacion ${videoProfile.resolution} a ${videoProfile.fps} FPS y ${recordingBitrate} kbps** conserva detalle y fluidez en el archivo local.`
-      : `El **stream ${videoProfile.resolution} a ${videoProfile.bitrate} kbps** prioriza estabilidad en ${request.platform}; la **grabacion ${videoProfile.resolution} a ${recordingBitrate} kbps** conserva mas calidad en el archivo local.`;
+      ? `La **grabacion ${recordingResolution} a ${fps} FPS y ${recordingBitrate} kbps** conserva detalle y fluidez en el archivo local.`
+      : `El **stream ${streamResolution} a ${streamBitrate} kbps** prioriza estabilidad en ${request.platform}; la **grabacion ${recordingResolution} a ${recordingBitrate} kbps** conserva mas calidad en el archivo local.`;
   const reasoning = `${hardwareMatch} ${baselineMatch} ${outputMatch}`;
 
   return {
     source: 'local',
     recommendations: {
-      canvas_resolution: videoProfile.resolution,
-      resolution: videoProfile.resolution,
-      recording_resolution: videoProfile.resolution,
-      fps: videoProfile.fps,
+      canvas_resolution: canvasResolution,
+      resolution: streamResolution,
+      recording_resolution: recordingResolution,
+      fps,
       encoder,
-      bitrate: videoProfile.bitrate,
+      bitrate: streamBitrate,
       recording_encoder: recordingEncoder,
       recording_bitrate: recordingBitrate,
       audio_bitrate: 320,

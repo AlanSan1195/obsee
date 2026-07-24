@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { parseGoal, type ParsedGoal, type ParsedHardware } from '../shared/goalParser';
-import type { OBSMode, OBSPlatform } from '../shared/types';
+import { getLocalRecommendationExplanation } from '../shared/localRecommendation';
+import type {
+  AIRecommendationField,
+  AIRecommendationSettings,
+  OBSMode,
+  OBSPlatform,
+} from '../shared/types';
 import { ConnectionDock } from './components/ConnectionDock';
 import { GoalComposer } from './components/GoalComposer';
 import { HardwareConfirmation } from './components/HardwareConfirmation';
@@ -95,7 +101,7 @@ export default function App() {
   const runAnalysis = async (goal: ParsedGoal) => {
     const mode = goal.mode;
     const platform = goal.platform ?? (mode === 'record_only' ? 'youtube' : null);
-    if (!mode || !platform) return;
+    if (!mode || !platform) return false;
 
     setIntakeState('analyzing');
     setAssistantQuestion(null);
@@ -159,12 +165,58 @@ export default function App() {
       }
 
       setActiveGoal(goal);
+      return true;
     } catch (analysisError) {
       console.error('Goal analysis failed:', analysisError);
       setIntakeState('clarifying');
+      return false;
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const refineGoal = async (
+    goal: ParsedGoal,
+    technicalOverrides: Partial<AIRecommendationSettings>,
+  ): Promise<boolean> => {
+    const completed = await runAnalysis(goal);
+    if (!completed) return false;
+
+    const state = useAppStore.getState();
+    const latest = state.recommendation;
+    if (!latest || !state.systemInfo || !state.mode || !state.platform) return true;
+
+    const changedFields = Object.keys(technicalOverrides) as AIRecommendationField[];
+    if (changedFields.length === 0) return true;
+
+    const currentRecommendations = {
+      ...latest.recommendations,
+      ...technicalOverrides,
+    };
+    const explanation = getLocalRecommendationExplanation({
+      systemInfo: state.systemInfo,
+      mode: state.mode,
+      platform: state.platform,
+      goal: goal.preferences,
+      originalRecommendations: latest.recommendations,
+      currentRecommendations,
+      changedFields,
+    });
+    setRecommendation({
+      ...latest,
+      originalRecommendations: latest.recommendations,
+      originalReasoning: latest.reasoning,
+      recommendations: currentRecommendations,
+      reasoning: explanation.reasoning,
+    });
+    if (state.consoleProfile) {
+      setConsoleProfile({
+        ...state.consoleProfile,
+        recommendations: currentRecommendations,
+        reasoning: explanation.reasoning,
+      });
+    }
+    return true;
   };
 
   const continueWithGoal = (parsed: ParsedGoal) => {
@@ -271,7 +323,11 @@ export default function App() {
       )}
 
       {recommendation && activeGoal ? (
-        <RecommendationReview goal={activeGoal} onNewGoal={startOver} />
+        <RecommendationReview
+          goal={activeGoal}
+          onNewGoal={startOver}
+          onRefineGoal={refineGoal}
+        />
       ) : (
         <main className="intake-shell">
           <section className="intake-hero">

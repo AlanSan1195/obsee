@@ -85,6 +85,7 @@ describe('getLocalConsoleProfile', () => {
       canvas_resolution: '1920x1080',
       recording_resolution: '1920x1080',
       encoder: 'nvenc',
+      bitrate: 60000,
     };
     aiResponse.reasoning = 'Usa NVENC y considera el monitor como limite de captura.';
 
@@ -101,6 +102,7 @@ describe('getLocalConsoleProfile', () => {
       recording_bitrate: 40000,
     });
     expect(result.reasoning).toContain('**stream 1920x1080 a 6000 kbps**');
+    expect(result.reasoning).not.toContain('60000 kbps');
     expect(result.reasoning).toContain('**grabacion 3840x2160 con APPLE VT HEVC a 40000 kbps**');
     expect(result.reasoning).toContain('**encoder APPLE VT H264**');
     expect(result.reasoning).not.toContain('NVENC');

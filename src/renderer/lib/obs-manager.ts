@@ -9,6 +9,7 @@ import type {
   OBSAudioDevice,
   OBSAudioFilterSnapshot,
   OBSAudioSettingsSnapshot,
+  OBSAdvancedOutputControl,
   OBSConfig,
   OBSConnectionSettings,
   OBSSettingsSnapshot,
@@ -19,6 +20,13 @@ import type {
   SourceKindFriendly,
 } from '../../shared/types';
 import { parseResolution } from '../../shared/validation';
+import {
+  encoderPatchFromSnapshot,
+  parseAdvancedOutputControl,
+  recordingQualityFromEncoder,
+  recordingQualityValue,
+  type OBSAdvancedApplyRequest,
+} from './obs-advanced-control';
 import {
   areObsrecFiltersConfigured,
   collectDuckingInputCandidates,
@@ -100,6 +108,53 @@ export class OBSManager {
 
   private emitStatus(message: string) {
     this.statusListener?.({ connected: this.connected, message });
+  }
+
+  private async getAdvancedOutputControl(): Promise<OBSAdvancedOutputControl | undefined> {
+    try {
+      const response = await this.obs.call('CallVendorRequest', {
+        vendorName: 'obsee',
+        requestType: 'GetAdvancedOutputConfig',
+        requestData: {},
+      });
+      return parseAdvancedOutputControl(response.responseData);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async applyAdvancedOutputControl(request: OBSAdvancedApplyRequest): Promise<{
+    success: boolean;
+    message: string;
+    control?: OBSAdvancedOutputControl;
+  }> {
+    try {
+      const response = await this.obs.call('CallVendorRequest', {
+        vendorName: 'obsee',
+        requestType: 'ApplyAdvancedOutputConfig',
+        requestData: request,
+      });
+      const responseData = response.responseData as Record<string, unknown>;
+      if (responseData.success !== true) {
+        return {
+          success: false,
+          message: typeof responseData.error === 'string'
+            ? responseData.error
+            : 'El complemento de Obsee rechazó los ajustes avanzados.',
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Ajustes avanzados aplicados por el complemento de Obsee',
+        control: parseAdvancedOutputControl(responseData),
+      };
+    } catch {
+      return {
+        success: false,
+        message: 'El complemento nativo de Obsee no está instalado o no respondió.',
+      };
+    }
   }
 
   async initialize() {
@@ -240,7 +295,18 @@ export class OBSManager {
         ? profileSettings.advancedRecordingResolution
         : outputResolution;
 
-      const audioResult = await this.getAudioSnapshot();
+      const [audioResult, advancedControl] = await Promise.all([
+        this.getAudioSnapshot(),
+        outputMode === 'Advanced'
+          ? this.getAdvancedOutputControl()
+          : Promise.resolve(undefined),
+      ]);
+      const streamEncoderSettings = advancedControl?.available
+        ? advancedControl.stream
+        : undefined;
+      const recordingEncoderSettings = advancedControl?.available
+        ? advancedControl.recording
+        : undefined;
 
       return {
         success: true,
@@ -265,17 +331,25 @@ export class OBSManager {
           encoder: outputMode === 'Advanced'
             ? profileSettings.advancedStreamEncoder || 'Unknown'
             : profileSettings.encoder || 'Unknown',
-          // OBS guarda el bitrate de video avanzado dentro de streamEncoder.json,
-          // que obs-websocket no expone. No mezclarlo con el VBitrate obsoleto
-          // de SimpleOutput: cero representa "no disponible" en la comparacion.
-          bitrate: outputMode === 'Advanced' ? 0 : getNumberSetting(profileSettings, 'bitrate'),
+          // El complemento nativo lee streamEncoder.json y los valores por
+          // defecto efectivos del encoder. Sin él, cero significa "no
+          // disponible" y evita reutilizar el VBitrate obsoleto de SimpleOutput.
+          bitrate: outputMode === 'Advanced'
+            ? streamEncoderSettings?.bitrate ?? 0
+            : getNumberSetting(profileSettings, 'bitrate'),
+          recordingBitrate: outputMode === 'Advanced'
+            ? recordingEncoderSettings?.bitrate
+            : undefined,
           audioBitrate: outputMode === 'Advanced'
             ? getNumberSetting(profileSettings, 'advancedAudioBitrate')
             : getNumberSetting(profileSettings, 'audioBitrate'),
           recordingFormat: outputMode === 'Advanced'
             ? profileSettings.advancedRecordingFormat || 'Unknown'
             : profileSettings.recordingFormat2 || profileSettings.recordingFormat || 'Unknown',
-          recordingQuality: outputMode === 'Advanced' ? 'advanced' : profileSettings.recordingQuality || 'Unknown',
+          recordingQuality: outputMode === 'Advanced'
+            ? recordingQualityFromEncoder(recordingEncoderSettings?.quality ?? 0)
+            : profileSettings.recordingQuality || 'Unknown',
+          advancedControl,
           audio: audioResult.success ? audioResult.snapshot : undefined,
         },
       };
@@ -472,6 +546,7 @@ export class OBSManager {
     try {
       const warnings: string[] = [];
       let requiresManualConfirmation = false;
+      let advancedApplyRequest: OBSAdvancedApplyRequest | undefined;
       const backupSnapshot = await this.getSettingsSnapshot();
       if (backupSnapshot.success && backupSnapshot.snapshot) {
         try {
@@ -528,7 +603,6 @@ export class OBSManager {
       const profileUpdates: Array<{ category: string; name: string; value: string }> = [];
 
       if (needsAdvancedOutput) {
-        requiresManualConfirmation = true;
         const streamEncoderId = getAdvancedEncoderId(config.encoder);
         const recordingEncoderId = getAdvancedEncoderId(recordingEncoder);
         const streamNeedsRescale = normalizedStreamResolution !== normalizedRecordingResolution;
@@ -562,10 +636,26 @@ export class OBSManager {
           warnings.push(`Encoder de grabacion "${recordingEncoder}" no se pudo asignar a OBS Advanced Output.`);
         }
 
-        const bitrateSummary = config.mode === 'stream_record'
-          ? `stream ${config.bitrate} kbps y grabacion ${recordingBitrate} kbps`
-          : `grabacion ${recordingBitrate} kbps`;
-        warnings.push(`OBS WebSocket no permite escribir los bitrates ni la calidad interna del modo avanzado (${bitrateSummary}, calidad ${config.recordingQuality ?? 'sin especificar'}). Confirma esos valores manualmente en Ajustes > Salida.`);
+        advancedApplyRequest = {
+          stream: config.mode === 'stream_record'
+            ? {
+              rate_control: 'CBR',
+              bitrate: config.bitrate,
+              keyint_sec: 2,
+              profile: 'high',
+              bframes: true,
+              spatial_aq_mode: 1,
+            }
+            : undefined,
+          recording: {
+            rate_control: 'CBR',
+            bitrate: recordingBitrate,
+            quality: recordingQualityValue(config.recordingQuality),
+            keyint_sec: 2,
+            bframes: true,
+            spatial_aq_mode: 1,
+          },
+        };
       } else {
         const encoderId = getSimpleEncoderId(config.encoder);
         profileUpdates.push(
@@ -593,6 +683,14 @@ export class OBSManager {
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           warnings.push(`${update.category}.${update.name}: ${errorMessage}`);
+        }
+      }
+
+      if (advancedApplyRequest) {
+        const advancedResult = await this.applyAdvancedOutputControl(advancedApplyRequest);
+        if (!advancedResult.success) {
+          requiresManualConfirmation = true;
+          warnings.push(`${advancedResult.message} Confirma los bitrates y la calidad en Ajustes > Salida.`);
         }
       }
 
@@ -705,6 +803,17 @@ export class OBSManager {
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           warnings.push(`${update.category}.${update.name}: ${errorMessage}`);
+        }
+      }
+
+      if (snapshot.outputMode === 'Advanced' && snapshot.advancedControl?.available) {
+        const restoreRequest: OBSAdvancedApplyRequest = {
+          stream: encoderPatchFromSnapshot(snapshot.advancedControl.stream),
+          recording: encoderPatchFromSnapshot(snapshot.advancedControl.recording),
+        };
+        const advancedRestore = await this.applyAdvancedOutputControl(restoreRequest);
+        if (!advancedRestore.success) {
+          warnings.push(`Ajustes internos avanzados: ${advancedRestore.message}`);
         }
       }
 

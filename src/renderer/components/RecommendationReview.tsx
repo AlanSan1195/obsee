@@ -1,6 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { ParsedGoal } from '../../shared/goalParser';
-import type { AIRecommendationSettings, OBSMode } from '../../shared/types';
+import { parseGoal, type ParsedGoal } from '../../shared/goalParser';
+import {
+  getLocalRecommendationExplanation,
+  getRecordingBitrate,
+  getStreamBitrate,
+} from '../../shared/localRecommendation';
+import {
+  recommendationEncoderOptions,
+  recommendationRecordingFormatOptions,
+  recommendationRecordingQualityOptions,
+} from '../../shared/recommendationOptions';
+import type {
+  AIRecommendationField,
+  AIRecommendationSettings,
+  OBSMode,
+} from '../../shared/types';
 import { useAppStore } from '../store';
 import { useAppAPI } from '../hooks/useAppAPI';
 import { appAPI } from '../lib/app-api';
@@ -14,11 +28,24 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { ConnectionDock } from './ConnectionDock';
 import { InlineEmphasis } from './InlineEmphasis';
 import { createDefaultAudioConfig } from './AudioConfiguration';
-import { IconActivity, IconCheck, IconRefresh, IconUpload, Spinner } from './ui';
+import {
+  IconActivity,
+  IconAlert,
+  IconCheck,
+  IconRefresh,
+  IconSliders,
+  IconUpload,
+  IconX,
+  Spinner,
+} from './ui';
 
 interface RecommendationReviewProps {
   goal: ParsedGoal;
   onNewGoal: () => void;
+  onRefineGoal: (
+    goal: ParsedGoal,
+    technicalOverrides: Partial<AIRecommendationSettings>,
+  ) => Promise<boolean>;
 }
 
 interface ReviewRow extends ComparisonRow {
@@ -31,6 +58,277 @@ const modeLabels: Record<OBSMode, string> = {
   record_only: 'grabar',
 };
 
+const resolutionOptions = ['1280x720', '1920x1080', '2560x1440', '3840x2160'];
+const fpsOptions = [30, 60, 120];
+const audioBitrateOptions = [160, 192, 256, 320];
+
+interface GoalMismatch {
+  label: string;
+  requested: string;
+  recommended: string;
+}
+
+function getGoalMismatches(
+  goal: ParsedGoal,
+  settings: AIRecommendationSettings,
+): GoalMismatch[] {
+  const mismatches: GoalMismatch[] = [];
+  if (
+    goal.mode !== 'record_only'
+    && goal.preferences.streamResolution
+    && goal.preferences.streamResolution !== settings.resolution
+  ) {
+    mismatches.push({
+      label: 'Stream',
+      requested: goal.preferences.streamResolution,
+      recommended: settings.resolution,
+    });
+  }
+  if (
+    goal.mode !== 'stream_only'
+    && goal.preferences.recordingResolution
+    && goal.preferences.recordingResolution !== settings.recording_resolution
+  ) {
+    mismatches.push({
+      label: 'Grabación',
+      requested: goal.preferences.recordingResolution,
+      recommended: settings.recording_resolution,
+    });
+  }
+  if (goal.preferences.fps && goal.preferences.fps !== settings.fps) {
+    mismatches.push({
+      label: 'Fluidez',
+      requested: `${goal.preferences.fps} FPS`,
+      recommended: `${settings.fps} FPS`,
+    });
+  }
+  return mismatches;
+}
+
+function resolutionPixels(resolution: string): number {
+  const [width, height] = resolution.split('x').map(Number);
+  return Number.isFinite(width) && Number.isFinite(height) ? width * height : 0;
+}
+
+interface RecommendationAdjusterProps {
+  goal: ParsedGoal;
+  settings: AIRecommendationSettings;
+  onClose: () => void;
+  onSubmit: RecommendationReviewProps['onRefineGoal'];
+}
+
+function RecommendationAdjuster({
+  goal,
+  settings,
+  onClose,
+  onSubmit,
+}: RecommendationAdjusterProps) {
+  const initialStreamResolution = goal.preferences.streamResolution ?? settings.resolution;
+  const initialRecordingResolution = goal.preferences.recordingResolution ?? settings.recording_resolution;
+  const initialFps = goal.preferences.fps ?? settings.fps;
+  const [clarification, setClarification] = useState('');
+  const [streamResolution, setStreamResolution] = useState(initialStreamResolution);
+  const [recordingResolution, setRecordingResolution] = useState(initialRecordingResolution);
+  const [fps, setFps] = useState(initialFps);
+  const [encoder, setEncoder] = useState(settings.encoder);
+  const [recordingEncoder, setRecordingEncoder] = useState(settings.recording_encoder);
+  const [bitrate, setBitrate] = useState(settings.bitrate);
+  const [recordingBitrate, setRecordingBitrate] = useState(settings.recording_bitrate);
+  const [audioBitrate, setAudioBitrate] = useState(settings.audio_bitrate);
+  const [recordingFormat, setRecordingFormat] = useState(settings.recording_format);
+  const [recordingQuality, setRecordingQuality] = useState(settings.recording_quality);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
+
+  const submitRefinement = async () => {
+    const parsed = clarification.trim() ? parseGoal(clarification) : null;
+    const description = clarification.trim()
+      ? `${goal.preferences.description}\nAclaración: ${clarification.trim()}`
+      : goal.preferences.description;
+    const selectedStreamChanged = streamResolution !== initialStreamResolution;
+    const selectedRecordingChanged = recordingResolution !== initialRecordingResolution;
+    const selectedFpsChanged = fps !== initialFps;
+    const refinedGoal: ParsedGoal = {
+      ...goal,
+      mode: goal.mode,
+      platform: parsed?.platform ?? goal.platform,
+      consoleModel: parsed?.consoleModel ?? goal.consoleModel,
+      captureCard: parsed?.captureCard ?? goal.captureCard,
+      monitor: parsed?.monitor ?? goal.monitor,
+      hardware: {
+        cpuModel: parsed?.hardware.cpuModel ?? goal.hardware.cpuModel,
+        cpuCores: parsed?.hardware.cpuCores ?? goal.hardware.cpuCores,
+        ramGb: parsed?.hardware.ramGb ?? goal.hardware.ramGb,
+      },
+      preferences: {
+        ...goal.preferences,
+        streamResolution: selectedStreamChanged
+          ? streamResolution
+          : parsed?.preferences.streamResolution ?? streamResolution,
+        recordingResolution: selectedRecordingChanged
+          ? recordingResolution
+          : parsed?.preferences.recordingResolution ?? recordingResolution,
+        fps: selectedFpsChanged ? fps : parsed?.preferences.fps ?? fps,
+        source: parsed?.consoleModel ? 'console' : goal.preferences.source,
+        deviceNotes: parsed?.preferences.deviceNotes ?? goal.preferences.deviceNotes,
+        description,
+      },
+    };
+    const technicalOverrides: Partial<AIRecommendationSettings> = {};
+    if (encoder !== settings.encoder) technicalOverrides.encoder = encoder;
+    if (recordingEncoder !== settings.recording_encoder) {
+      technicalOverrides.recording_encoder = recordingEncoder;
+    }
+    if (bitrate !== settings.bitrate) technicalOverrides.bitrate = bitrate;
+    if (recordingBitrate !== settings.recording_bitrate) {
+      technicalOverrides.recording_bitrate = recordingBitrate;
+    }
+    if (audioBitrate !== settings.audio_bitrate) technicalOverrides.audio_bitrate = audioBitrate;
+    if (recordingFormat !== settings.recording_format) {
+      technicalOverrides.recording_format = recordingFormat;
+    }
+    if (recordingQuality !== settings.recording_quality) {
+      technicalOverrides.recording_quality = recordingQuality;
+    }
+
+    setIsRefining(true);
+    const success = await onSubmit(refinedGoal, technicalOverrides);
+    setIsRefining(false);
+    if (success) onClose();
+  };
+
+  return (
+    <section className="recommendation-adjuster" aria-labelledby="adjuster-title">
+      <div className="recommendation-adjuster__header">
+        <div>
+          <span className="eyebrow">Ajustar recomendación</span>
+          <h2 id="adjuster-title">Corrige lo que Obsee debe respetar</h2>
+          <p>Conservaremos tu contexto y volveremos a validar las salidas con esta precisión.</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Cerrar ajustes">
+          <IconX className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="recommendation-adjuster__quick">
+        <button type="button" onClick={() => setStreamResolution('1920x1080')}>Stream 1080p</button>
+        <button type="button" onClick={() => setRecordingResolution('3840x2160')}>Grabar en 4K</button>
+        <button type="button" onClick={() => setFps(60)}>Conservar 60 FPS</button>
+      </div>
+
+      <label className="recommendation-adjuster__clarification">
+        <span>Aclara el detalle inesperado</span>
+        <textarea
+          value={clarification}
+          onChange={(event) => setClarification(event.target.value)}
+          placeholder="Ej.: el stream sí va a 1080p, pero la grabación local debe ser 4K60."
+          rows={3}
+        />
+      </label>
+
+      <div className="recommendation-adjuster__intent">
+        {goal.mode !== 'record_only' && (
+          <label>
+            <span>Salida del stream</span>
+            <select value={streamResolution} onChange={(event) => setStreamResolution(event.target.value)}>
+              {resolutionOptions.map((option) => <option key={option}>{option}</option>)}
+            </select>
+          </label>
+        )}
+        {goal.mode !== 'stream_only' && (
+          <label>
+            <span>Grabación local</span>
+            <select value={recordingResolution} onChange={(event) => setRecordingResolution(event.target.value)}>
+              {resolutionOptions.map((option) => <option key={option}>{option}</option>)}
+            </select>
+          </label>
+        )}
+        <label>
+          <span>Fluidez</span>
+          <select value={fps} onChange={(event) => setFps(Number(event.target.value))}>
+            {fpsOptions.map((option) => <option key={option} value={option}>{option} FPS</option>)}
+          </select>
+        </label>
+      </div>
+
+      <button
+        type="button"
+        className="recommendation-adjuster__advanced-toggle"
+        aria-expanded={advancedOpen}
+        onClick={() => setAdvancedOpen((value) => !value)}
+      >
+        <IconSliders className="h-4 w-4" />
+        Ajustes técnicos
+        <span>{advancedOpen ? 'Ocultar' : 'Editar encoders y bitrates'}</span>
+      </button>
+
+      {advancedOpen && (
+        <div className="recommendation-adjuster__technical">
+          {goal.mode !== 'record_only' && (
+            <>
+              <label>
+                <span>Encoder del stream</span>
+                <select value={encoder} onChange={(event) => setEncoder(event.target.value)}>
+                  {recommendationEncoderOptions.map((option) => <option key={option}>{option}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Bitrate del stream</span>
+                <div><input type="number" min={500} max={100000} step={500} value={bitrate} onChange={(event) => setBitrate(Number(event.target.value))} /><small>kbps</small></div>
+              </label>
+            </>
+          )}
+          {goal.mode !== 'stream_only' && (
+            <>
+              <label>
+                <span>Encoder de grabación</span>
+                <select value={recordingEncoder} onChange={(event) => setRecordingEncoder(event.target.value)}>
+                  {recommendationEncoderOptions.map((option) => <option key={option}>{option}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Bitrate de grabación</span>
+                <div><input type="number" min={500} max={200000} step={500} value={recordingBitrate} onChange={(event) => setRecordingBitrate(Number(event.target.value))} /><small>kbps</small></div>
+              </label>
+              <label>
+                <span>Formato de grabación</span>
+                <select value={recordingFormat} onChange={(event) => setRecordingFormat(event.target.value)}>
+                  {recommendationRecordingFormatOptions.map((option) => <option key={option}>{option}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Calidad de grabación</span>
+                <select value={recordingQuality} onChange={(event) => setRecordingQuality(event.target.value)}>
+                  {recommendationRecordingQualityOptions.map((option) => <option key={option}>{option}</option>)}
+                </select>
+              </label>
+            </>
+          )}
+          <label>
+            <span>Bitrate de audio</span>
+            <select value={audioBitrate} onChange={(event) => setAudioBitrate(Number(event.target.value))}>
+              {audioBitrateOptions.map((option) => <option key={option} value={option}>{option} kbps</option>)}
+            </select>
+          </label>
+        </div>
+      )}
+
+      <div className="recommendation-adjuster__footer">
+        <p>Antes de aplicar verás nuevamente la comparación contra tu OBS.</p>
+        <button
+          type="button"
+          className="calm-button calm-button--primary"
+          disabled={isRefining}
+          onClick={() => void submitRefinement()}
+        >
+          {isRefining ? <Spinner className="h-4 w-4 border-background/70 border-t-transparent" /> : <IconRefresh className="h-4 w-4" />}
+          {isRefining ? 'Recalculando…' : 'Actualizar recomendación'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function recommendationReasons(settings: AIRecommendationSettings): Record<string, string> {
   return {
     'Lienzo base': 'Es el área de trabajo. Conserva el detalle de la fuente antes de crear cada salida.',
@@ -39,8 +337,18 @@ function recommendationReasons(settings: AIRecommendationSettings): Record<strin
     FPS: `${settings.fps} FPS mantienen el movimiento fluido sin pedir cuadros que el perfil no necesita.`,
     'Encoder del stream': 'Comprime la emisión con el motor más adecuado para el hardware detectado.',
     'Bitrate del stream': 'Controla detalle y consumo de subida; está ajustado al destino y resolución.',
+    'Control de tasa del stream': 'CBR mantiene una entrega estable para la plataforma de transmisión.',
+    'Fotogramas clave del stream': 'Dos segundos es el intervalo esperado por las plataformas principales.',
+    'Perfil del stream': 'High conserva eficiencia y compatibilidad para H.264.',
+    'B-frames del stream': 'Mejoran la compresión sin aumentar el bitrate objetivo.',
+    'AQ espacial del stream': 'Automático deja que VideoToolbox adapte detalle a cada escena.',
     'Encoder de grabacion': 'Separa el trabajo del archivo local para conservar calidad sin atarlo al stream.',
     'Bitrate de grabacion': 'Da margen adicional a escenas con movimiento y reduce artefactos en el archivo.',
+    'Control de tasa de grabacion': 'Mantiene predecible el tamaño y la tasa del archivo local.',
+    'Fotogramas clave de grabacion': 'Facilita búsqueda y edición sin crear fotogramas clave innecesarios.',
+    'Perfil de grabacion': 'Conserva el perfil y la profundidad de color que ya usa el encoder local.',
+    'B-frames de grabacion': 'Aprovecha mejor el bitrate del archivo para conservar detalle.',
+    'AQ espacial de grabacion': 'Automático distribuye calidad según la complejidad visual.',
     'Bitrate de audio': 'Conserva voz, música y juego con suficiente definición sin desperdiciar ancho de banda.',
     'Formato de grabacion': settings.recording_format === 'mkv'
       ? 'MKV protege la grabación si OBS o el equipo se cierran inesperadamente.'
@@ -82,19 +390,18 @@ function makeReviewRows(
   return (currentRows ?? fallbackRows)
     .filter((row) => visibleForMode(row.label, mode))
     .map((row) => {
-      const applyMethod = row.label === 'Bitrate de grabacion'
+      const fallbackApplyMethod = row.label === 'Bitrate de grabacion'
         ? 'manual'
-        : row.label === 'Bitrate del stream'
+        : row.label === 'Bitrate del stream' || row.label === 'Calidad de grabacion'
           ? mode === 'stream_only' ? 'automatic' : 'manual'
-          : row.label === 'Calidad de grabacion'
-            ? mode === 'stream_only' ? 'automatic' : 'manual'
-          : row.applyMethod;
+          : undefined;
+      const applyMethod = row.applyMethod ?? fallbackApplyMethod;
 
       return {
         ...row,
         applyMethod,
         reason: applyMethod === 'manual'
-          ? 'OBS WebSocket no expone ni permite cambiar este valor en modo avanzado. Obsee muestra el objetivo, pero debes confirmarlo en Ajustes > Salida.'
+          ? 'Instala el complemento nativo de Obsee para leer y aplicar este valor de Salida avanzada; sin él debes confirmarlo en Ajustes > Salida.'
           : reasons[row.label] ?? 'Ajuste calculado para el objetivo y hardware detectados.',
       };
     });
@@ -108,7 +415,7 @@ function formatValue(row: ReviewRow, value: string): string {
   return value.toUpperCase();
 }
 
-export function RecommendationReview({ goal, onNewGoal }: RecommendationReviewProps) {
+export function RecommendationReview({ goal, onNewGoal, onRefineGoal }: RecommendationReviewProps) {
   const {
     mode,
     platform,
@@ -119,14 +426,18 @@ export function RecommendationReview({ goal, onNewGoal }: RecommendationReviewPr
     obsAudioSnapshot,
     consoleProfile,
     isApplying,
+    setConsoleProfile,
     setError,
     setObsMessage,
+    setRecommendation,
   } = useAppStore();
   const { applyConfig, restoreLastBackup } = useAppAPI();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [backupDate, setBackupDate] = useState<string | null>(null);
   const [applyStatus, setApplyStatus] = useState<'idle' | 'complete' | 'partial'>('idle');
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [mismatchAcknowledged, setMismatchAcknowledged] = useState(false);
 
   useEffect(() => {
     if (!obsConnected) return;
@@ -142,6 +453,17 @@ export function RecommendationReview({ goal, onNewGoal }: RecommendationReviewPr
       : null;
     return makeReviewRows(mode, recommendation.recommendations, currentRows);
   }, [mode, obsSettingsSnapshot, recommendation]);
+  const mismatches = useMemo(
+    () => recommendation ? getGoalMismatches(goal, recommendation.recommendations) : [],
+    [goal, recommendation],
+  );
+  const mismatchKey = mismatches
+    .map((mismatch) => `${mismatch.label}:${mismatch.requested}:${mismatch.recommended}`)
+    .join('|');
+
+  useEffect(() => {
+    setMismatchAcknowledged(false);
+  }, [mismatchKey]);
 
   if (!mode || !platform || !recommendation || !systemInfo) return null;
 
@@ -156,6 +478,60 @@ export function RecommendationReview({ goal, onNewGoal }: RecommendationReviewPr
     : mode === 'stream_only'
       ? `Stream ${settings.resolution} a ${settings.fps} FPS`
       : `Grabación ${settings.recording_resolution} a ${settings.fps} FPS`;
+
+  const handleUseRequestedGoal = () => {
+    const requestedSettings: AIRecommendationSettings = {
+      ...settings,
+      resolution: goal.mode === 'record_only'
+        ? settings.resolution
+        : goal.preferences.streamResolution ?? settings.resolution,
+      recording_resolution: goal.mode === 'stream_only'
+        ? settings.recording_resolution
+        : goal.preferences.recordingResolution ?? settings.recording_resolution,
+      fps: goal.preferences.fps ?? settings.fps,
+    };
+    requestedSettings.canvas_resolution = resolutionPixels(requestedSettings.recording_resolution)
+      > resolutionPixels(requestedSettings.resolution)
+      ? requestedSettings.recording_resolution
+      : requestedSettings.resolution;
+    requestedSettings.bitrate = getStreamBitrate(
+      platform,
+      requestedSettings.resolution,
+      requestedSettings.fps,
+    );
+    requestedSettings.recording_bitrate = getRecordingBitrate(
+      requestedSettings.recording_resolution,
+      requestedSettings.fps,
+      requestedSettings.recording_encoder,
+    );
+    const fields = Object.keys(requestedSettings) as AIRecommendationField[];
+    const changedFields = fields.filter((field) => requestedSettings[field] !== settings[field]);
+    const explanation = getLocalRecommendationExplanation({
+      systemInfo,
+      mode,
+      platform,
+      goal: goal.preferences,
+      originalRecommendations: settings,
+      currentRecommendations: requestedSettings,
+      changedFields,
+    });
+    const reasoning = `Se priorizó la salida que pediste. Si la fuente de captura sigue en una resolución menor, OBS la escalará; revisa las propiedades de la capturadora para obtener 4K real. ${explanation.reasoning}`;
+    setRecommendation({
+      ...recommendation,
+      originalRecommendations: recommendation.originalRecommendations ?? settings,
+      originalReasoning: recommendation.originalReasoning ?? recommendation.reasoning,
+      recommendations: requestedSettings,
+      reasoning,
+    });
+    if (consoleProfile) {
+      setConsoleProfile({
+        ...consoleProfile,
+        recommendations: requestedSettings,
+        reasoning,
+      });
+    }
+    setAdjustOpen(false);
+  };
 
   const handleApply = async () => {
     try {
@@ -213,6 +589,89 @@ export function RecommendationReview({ goal, onNewGoal }: RecommendationReviewPr
         </div>
       </section>
 
+      <section className="intent-contract" aria-labelledby="intent-contract-title">
+        <div>
+          <span className="eyebrow">Lo que entendimos</span>
+          <h2 id="intent-contract-title">Objetivo que esta recomendación debe respetar</h2>
+        </div>
+        <div className="intent-contract__items">
+          {mode !== 'record_only' && (
+            <span>
+              <small>Emitir</small>
+              <strong>{goal.preferences.streamResolution ?? settings.resolution}</strong>
+            </span>
+          )}
+          {mode !== 'stream_only' && (
+            <span>
+              <small>Grabar</small>
+              <strong>{goal.preferences.recordingResolution ?? settings.recording_resolution}</strong>
+            </span>
+          )}
+          <span>
+            <small>Fluidez</small>
+            <strong>{goal.preferences.fps ?? settings.fps} FPS</strong>
+          </span>
+          <span>
+            <small>Fuente</small>
+            <strong>{goal.captureCard ?? (goal.consoleModel ? 'Consola' : 'Este equipo')}</strong>
+          </span>
+        </div>
+        <button type="button" className="calm-button calm-button--ghost" onClick={() => setAdjustOpen(true)}>
+          <IconSliders className="h-4 w-4" />
+          Corregir
+        </button>
+      </section>
+
+      {mismatches.length > 0 && (
+        <section className="intent-warning" role="alert">
+          <div className="intent-warning__icon"><IconAlert className="h-5 w-5" /></div>
+          <div>
+            <span className="eyebrow">Hay un detalle sin cumplir</span>
+            <h2>La recomendación no coincide con una instrucción explícita</h2>
+            <div className="intent-warning__diffs">
+              {mismatches.map((mismatch) => (
+                <span key={mismatch.label}>
+                  <strong>{mismatch.label}</strong>
+                  Pediste {mismatch.requested}
+                  <i aria-hidden="true">→</i>
+                  Resultado {mismatch.recommended}
+                </span>
+              ))}
+            </div>
+            <p>
+              Puede ser un límite verificado de la capturadora o una interpretación incorrecta.
+              Revísalo antes de escribir cambios en OBS.
+            </p>
+          </div>
+          <div className="intent-warning__actions">
+            <button type="button" className="calm-button calm-button--primary" onClick={() => setAdjustOpen(true)}>
+              Ajustar ahora
+            </button>
+            <button type="button" className="calm-button calm-button--ghost" onClick={handleUseRequestedGoal}>
+              Usar lo que pedí
+            </button>
+            <button
+              type="button"
+              className={`calm-button calm-button--ghost ${mismatchAcknowledged ? 'is-acknowledged' : ''}`}
+              onClick={() => setMismatchAcknowledged(true)}
+            >
+              {mismatchAcknowledged ? <IconCheck className="h-4 w-4" /> : null}
+              {mismatchAcknowledged ? 'Limitación aceptada' : 'Aceptar este resultado'}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {adjustOpen && (
+        <RecommendationAdjuster
+          key={`${settings.resolution}-${settings.recording_resolution}-${settings.fps}`}
+          goal={goal}
+          settings={settings}
+          onClose={() => setAdjustOpen(false)}
+          onSubmit={onRefineGoal}
+        />
+      )}
+
       <section className="reasoning-card">
         <div className="reasoning-card__icon">
           <IconActivity className="h-5 w-5" />
@@ -254,6 +713,9 @@ export function RecommendationReview({ goal, onNewGoal }: RecommendationReviewPr
             <h2 id="recommendation-title">Qué cambia y para qué sirve</h2>
           </div>
           <span>
+            {obsSettingsSnapshot?.advancedControl?.available
+              ? `Complemento avanzado ${obsSettingsSnapshot.advancedControl.pluginVersion} activo · `
+              : ''}
             {automaticRows.length} automático{automaticRows.length === 1 ? '' : 's'}
             {manualRows.length > 0 ? ` · ${manualRows.length} manual${manualRows.length === 1 ? '' : 'es'}` : ''}
           </span>
@@ -311,9 +773,9 @@ export function RecommendationReview({ goal, onNewGoal }: RecommendationReviewPr
             {applyStatus === 'complete'
               ? 'Verificamos el nuevo estado después de escribir los cambios.'
               : applyStatus === 'partial'
-                ? 'Confirma el bitrate y la calidad marcados como Manual en Ajustes > Salida de OBS.'
+                ? 'Instala el complemento de Obsee o confirma los ajustes marcados como Manual en Ajustes > Salida.'
                 : manualRows.length > 0
-                  ? 'El bitrate y la calidad avanzados no se pueden leer ni escribir por OBS WebSocket.'
+                  ? 'El complemento nativo habilita la lectura y escritura de los encoders avanzados.'
                   : 'Nada se modifica hasta que confirmes.'}
           </small>
         </div>
@@ -329,15 +791,29 @@ export function RecommendationReview({ goal, onNewGoal }: RecommendationReviewPr
               Nueva configuración
             </button>
           ) : (
-            <button
-              type="button"
-              disabled={!obsConnected || isApplying}
-              onClick={() => setConfirmOpen(true)}
-              className="calm-button calm-button--primary"
-            >
-              {isApplying ? <Spinner className="h-4 w-4 border-background/70 border-t-transparent" /> : <IconUpload className="h-4 w-4" />}
-              {isApplying ? 'Aplicando…' : `Aplicar ${automaticRows.length} cambios`}
-            </button>
+            <>
+              <button type="button" onClick={() => setAdjustOpen(true)} className="calm-button calm-button--ghost">
+                <IconSliders className="h-4 w-4" />
+                Ajustar recomendación
+              </button>
+              <button
+                type="button"
+                disabled={!obsConnected || isApplying || (mismatches.length > 0 && !mismatchAcknowledged)}
+                onClick={() => setConfirmOpen(true)}
+                className="calm-button calm-button--primary"
+              >
+                {isApplying
+                  ? <Spinner className="h-4 w-4 border-background/70 border-t-transparent" />
+                  : mismatches.length > 0 && !mismatchAcknowledged
+                    ? <IconAlert className="h-4 w-4" />
+                    : <IconUpload className="h-4 w-4" />}
+                {isApplying
+                  ? 'Aplicando…'
+                  : mismatches.length > 0 && !mismatchAcknowledged
+                    ? 'Revisar antes de aplicar'
+                    : `Aplicar ${automaticRows.length} cambios`}
+              </button>
+            </>
           )}
         </div>
       </section>
@@ -359,11 +835,11 @@ export function RecommendationReview({ goal, onNewGoal }: RecommendationReviewPr
         <p>Obsee cambiará {automaticRows.length} ajustes compatibles de video, salida y grabación.</p>
         {manualRows.length > 0 && (
           <p>
-            Los {manualRows.length} ajustes marcados como Manual no se pueden leer, aplicar ni respaldar
-            mediante OBS WebSocket. Tendrás que confirmarlos en Ajustes &gt; Salida.
+            Los {manualRows.length} ajustes marcados como Manual requieren el complemento nativo de Obsee.
+            Sin él tendrás que confirmarlos en Ajustes &gt; Salida.
           </p>
         )}
-        <p>Antes guardará automáticamente los valores que OBS WebSocket sí permite restaurar.</p>
+        <p>Antes guardará automáticamente un respaldo de los valores detectados.</p>
       </ConfirmDialog>
       <ConfirmDialog
         open={restoreOpen}

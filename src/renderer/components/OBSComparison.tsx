@@ -79,7 +79,8 @@ export function buildComparisonRows(
   snapshot: OBSSettingsSnapshot,
   recommendations: AIRecommendation['recommendations'],
 ): ComparisonRow[] {
-  return [
+  const advancedAutomatic = snapshot.advancedControl?.available === true;
+  const rows: ComparisonRow[] = [
     {
       label: 'Lienzo base',
       current: snapshot.baseResolution,
@@ -110,7 +111,7 @@ export function buildComparisonRows(
       label: 'Bitrate del stream',
       current: snapshot.bitrate > 0 ? String(snapshot.bitrate) : 'No disponible por WebSocket',
       recommended: String(recommendations.bitrate),
-      applyMethod: snapshot.outputMode === 'Advanced' ? 'manual' : 'automatic',
+      applyMethod: snapshot.outputMode === 'Advanced' && !advancedAutomatic ? 'manual' : 'automatic',
     },
     {
       label: 'Encoder de grabacion',
@@ -120,9 +121,13 @@ export function buildComparisonRows(
     },
     {
       label: 'Bitrate de grabacion',
-      current: snapshot.outputMode === 'Advanced' ? 'No disponible por WebSocket' : 'No independiente',
+      current: snapshot.outputMode === 'Advanced'
+        ? snapshot.recordingBitrate && snapshot.recordingBitrate > 0
+          ? String(snapshot.recordingBitrate)
+          : 'No disponible por WebSocket'
+        : 'No independiente',
       recommended: String(recommendations.recording_bitrate),
-      applyMethod: 'manual',
+      applyMethod: snapshot.outputMode === 'Advanced' && advancedAutomatic ? 'automatic' : 'manual',
     },
     {
       label: 'Bitrate de audio',
@@ -139,9 +144,91 @@ export function buildComparisonRows(
       current: snapshot.recordingQuality,
       recommended: recommendations.recording_quality,
       type: 'recordingQuality',
-      applyMethod: snapshot.outputMode === 'Advanced' ? 'manual' : 'automatic',
+      applyMethod: snapshot.outputMode === 'Advanced' && !advancedAutomatic ? 'manual' : 'automatic',
     },
   ];
+
+  const stream = snapshot.advancedControl?.stream;
+  const recording = snapshot.advancedControl?.recording;
+  if (!advancedAutomatic || !stream || !recording) return rows;
+
+  const spatialAQLabel = (value: number) => {
+    if (value === 2) return 'Desactivado';
+    if (value === 3) return 'Activado';
+    return 'Automatico';
+  };
+  const booleanLabel = (value: boolean) => value ? 'Si' : 'No';
+
+  rows.splice(6, 0,
+    {
+      label: 'Control de tasa del stream',
+      current: stream.rateControl,
+      recommended: 'CBR',
+      applyMethod: 'automatic',
+    },
+    {
+      label: 'Fotogramas clave del stream',
+      current: String(stream.keyframeInterval),
+      recommended: '2',
+      applyMethod: 'automatic',
+    },
+    {
+      label: 'Perfil del stream',
+      current: stream.profile,
+      recommended: 'high',
+      applyMethod: 'automatic',
+    },
+    {
+      label: 'B-frames del stream',
+      current: booleanLabel(stream.bFrames),
+      recommended: 'Si',
+      applyMethod: 'automatic',
+    },
+    {
+      label: 'AQ espacial del stream',
+      current: spatialAQLabel(stream.spatialAQMode),
+      recommended: 'Automatico',
+      applyMethod: 'automatic',
+    },
+  );
+
+  const recordingEncoderIndex = rows.findIndex((row) => row.label === 'Encoder de grabacion');
+  rows.splice(recordingEncoderIndex + 2, 0,
+    {
+      label: 'Control de tasa de grabacion',
+      current: recording.rateControl,
+      recommended: 'CBR',
+      applyMethod: 'automatic',
+    },
+    {
+      label: 'Fotogramas clave de grabacion',
+      current: String(recording.keyframeInterval),
+      recommended: '2',
+      applyMethod: 'automatic',
+    },
+    {
+      label: 'Perfil de grabacion',
+      current: recording.profile,
+      // La recomendación actual no cambia profundidad de color; conservar el
+      // perfil detectado evita degradar main10 a main.
+      recommended: recording.profile,
+      applyMethod: 'automatic',
+    },
+    {
+      label: 'B-frames de grabacion',
+      current: booleanLabel(recording.bFrames),
+      recommended: 'Si',
+      applyMethod: 'automatic',
+    },
+    {
+      label: 'AQ espacial de grabacion',
+      current: spatialAQLabel(recording.spatialAQMode),
+      recommended: 'Automatico',
+      applyMethod: 'automatic',
+    },
+  );
+
+  return rows;
 }
 
 export function OBSComparison() {
@@ -209,6 +296,9 @@ export function OBSComparison() {
                 : 'border-warning/40 bg-warning/10 text-warning'
             }`}
           >
+            {obsSettingsSnapshot.advancedControl?.available
+              ? `Complemento ${obsSettingsSnapshot.advancedControl.pluginVersion} · `
+              : ''}
             {automaticCount} cambio{automaticCount === 1 ? '' : 's'}
             {manualCount > 0 ? ` · ${manualCount} manual${manualCount === 1 ? '' : 'es'}` : ''}
           </span>

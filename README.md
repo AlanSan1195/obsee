@@ -64,6 +64,11 @@ Decisiones vigentes:
 - **Nunca sin respuesta**: si la IA no está disponible (sin red, límite diario), un motor de recomendación local genera la configuración.
 - **IA local durante desarrollo**: Vite ejecuta los mismos handlers de `api/` contra Ollama; Groq solo se usa en producción o con `pnpm run dev:remote`.
 - **Respaldo antes de tocar**: la configuración actual de OBS se guarda en `localStorage` y se puede restaurar desde la pestaña de comparación.
+- **Salida avanzada real**: el complemento opcional de
+  [Obsee Advanced Output Control](obs-plugin/README.md) lee y aplica bitrate,
+  control de tasa, calidad, keyframes, perfil, B-frames y AQ de los encoders de
+  emisión y grabación. Sin él, la interfaz marca esos valores como manuales en
+  lugar de confundirlos con la configuración antigua de Salida simple.
 - **Flujo guiado en 4 pasos**: conectar → ajustes (hardware, modo, plataforma) → detección (recomendación + audio) → escenas (con vista previa en vivo).
 - **Perfilado de consolas** (PS5/Xbox/Switch): detecta tu capturadora, lee sus capacidades reales desde OBS y recomienda la cadena de captura completa.
 

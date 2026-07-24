@@ -163,6 +163,31 @@ export interface OBSAudioSettingsSnapshot {
   warnings: string[];
 }
 
+export interface OBSAdvancedEncoderSettings {
+  available: boolean;
+  encoderId: string;
+  active: boolean;
+  rateControl: string;
+  bitrate: number;
+  quality: number;
+  limitBitrate: boolean;
+  maxBitrate: number;
+  maxBitrateWindow: number;
+  keyframeInterval: number;
+  profile: string;
+  bFrames: boolean;
+  // Apple VideoToolbox: 1 = automático, 2 = desactivado, 3 = activado.
+  spatialAQMode: number;
+}
+
+export interface OBSAdvancedOutputControl {
+  available: boolean;
+  pluginVersion: string;
+  outputMode: string;
+  stream?: OBSAdvancedEncoderSettings;
+  recording?: OBSAdvancedEncoderSettings;
+}
+
 export interface OBSSettingsSnapshot {
   streamServer: string;
   baseResolution: string;
@@ -182,9 +207,11 @@ export interface OBSSettingsSnapshot {
   fps: number;
   encoder: string;
   bitrate: number;
+  recordingBitrate?: number;
   audioBitrate: number;
   recordingFormat: string;
   recordingQuality: string;
+  advancedControl?: OBSAdvancedOutputControl;
   audio?: OBSAudioSettingsSnapshot;
 }
 

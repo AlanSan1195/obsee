@@ -30,34 +30,73 @@ function normalize(value: string): string {
     .toLowerCase();
 }
 
-function findResolution(value: string): string | undefined {
-  const explicit = /\b(\d{3,4})\s*[x×]\s*(\d{3,4})\b/i.exec(value);
+interface ResolutionMention {
+  index: number;
+  resolution: string;
+}
+
+function findResolutionMentions(value: string): ResolutionMention[] {
+  const explicitPattern = /\b(\d{3,4})\s*[x×]\s*(\d{3,4})\b/gi;
   const candidates = resolutionAliases.flatMap(([pattern, resolution]) => {
-    const match = pattern.exec(value);
-    return match ? [{ index: match.index, resolution }] : [];
+    const globalPattern = new RegExp(pattern.source, `${pattern.flags.replace('g', '')}g`);
+    return Array.from(value.matchAll(globalPattern), (match) => ({
+      index: match.index,
+      resolution,
+    }));
   });
-  if (explicit) {
-    candidates.push({ index: explicit.index, resolution: `${explicit[1]}x${explicit[2]}` });
+  for (const match of value.matchAll(explicitPattern)) {
+    candidates.push({
+      index: match.index,
+      resolution: `${match[1]}x${match[2]}`,
+    });
   }
   candidates.sort((a, b) => a.index - b.index);
-  return candidates[0]?.resolution;
+  return candidates.filter((candidate, index) => (
+    index === 0
+    || candidate.index !== candidates[index - 1].index
+    || candidate.resolution !== candidates[index - 1].resolution
+  ));
 }
 
 function findResolutionNear(text: string, keywords: string[]): string | undefined {
   const normalized = normalize(text);
   const keywordPattern = keywords.join('|');
-  const after = new RegExp(`(?:${keywordPattern})[\\s\\S]{0,70}`, 'i').exec(normalized);
-  const afterResolution = after ? findResolution(after[0]) : undefined;
-  if (afterResolution) return afterResolution;
+  const mentions = findResolutionMentions(normalized);
+  const keywordMatches = Array.from(
+    normalized.matchAll(new RegExp(`(?:${keywordPattern})`, 'gi')),
+  );
 
-  const before = new RegExp(`[\\s\\S]{0,40}(?:${keywordPattern})`, 'i').exec(normalized);
-  return before ? findResolution(before[0]) : undefined;
+  // Recorremos todas las apariciones del verbo, no solo la primera. Esto evita
+  // que una introduccion como "quiero streamear y grabar" oculte la instruccion
+  // concreta posterior: "streamear a 1080p y grabar en 4K".
+  const afterCandidates = keywordMatches.flatMap((keyword) => {
+    const start = keyword.index + keyword[0].length;
+    return mentions
+      .filter((mention) => mention.index >= start && mention.index - start <= 90)
+      .map((mention) => ({
+        ...mention,
+        distance: mention.index - start,
+      }));
+  });
+  afterCandidates.sort((a, b) => a.distance - b.distance || b.index - a.index);
+  if (afterCandidates[0]) return afterCandidates[0].resolution;
+
+  const beforeCandidates = keywordMatches.flatMap((keyword) => (
+    mentions
+      .filter((mention) => mention.index < keyword.index && keyword.index - mention.index <= 45)
+      .map((mention) => ({
+        ...mention,
+        distance: keyword.index - mention.index,
+      }))
+  ));
+  beforeCandidates.sort((a, b) => a.distance - b.distance || b.index - a.index);
+  return beforeCandidates[0]?.resolution;
 }
 
 function parseMode(text: string): OBSMode | null {
   const normalized = normalize(text);
   const wantsStream = /\b(stream|streaming|stremear|streamear|transmitir|transmision|directo|emitir|emision)\b/.test(normalized);
-  const wantsRecording = /\b(grabar|grabacion|recording|recordar|guardar|archivo local|copia local)\b/.test(normalized);
+  const wantsRecording = /\b(graba(?:r|ndo)?|grabacion|recording|recordar|guardar|archivo local|copia local)\b/.test(normalized);
 
   if (wantsStream && wantsRecording) return 'stream_record';
   if (wantsStream) return 'stream_only';
@@ -121,7 +160,7 @@ export function parseGoal(text: string): ParsedGoal {
     'directo',
   ]);
   const recordingResolution = findResolutionNear(text, [
-    'grabar',
+    'graba(?:r|ndo)?',
     'grabacion',
     'archivo',
     'guardar',

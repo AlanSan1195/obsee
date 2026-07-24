@@ -103,6 +103,67 @@ describe('buildComparisonRows', () => {
     });
     expect(rows.find((row) => row.label === 'Bitrate de audio')?.current).toBe('320');
   });
+
+  it('usa los valores reales y marca automática toda la codificación cuando está el complemento', () => {
+    const rows = buildComparisonRows({
+      ...snapshot,
+      outputMode: 'Advanced',
+      bitrate: 8000,
+      recordingBitrate: 40000,
+      recordingQuality: 'high',
+      advancedControl: {
+        available: true,
+        pluginVersion: '0.1.0',
+        outputMode: 'Advanced',
+        stream: {
+          available: true,
+          encoderId: 'com.apple.videotoolbox.videoencoder.ave.avc',
+          active: false,
+          rateControl: 'CBR',
+          bitrate: 8000,
+          quality: 60,
+          limitBitrate: false,
+          maxBitrate: 6000,
+          maxBitrateWindow: 1.5,
+          keyframeInterval: 2,
+          profile: 'high',
+          bFrames: true,
+          spatialAQMode: 1,
+        },
+        recording: {
+          available: true,
+          encoderId: 'com.apple.videotoolbox.videoencoder.ave.hevc',
+          active: false,
+          rateControl: 'CBR',
+          bitrate: 40000,
+          quality: 76,
+          limitBitrate: false,
+          maxBitrate: 6000,
+          maxBitrateWindow: 1.5,
+          keyframeInterval: 2,
+          profile: 'main10',
+          bFrames: true,
+          spatialAQMode: 1,
+        },
+      },
+    }, recommendations);
+
+    expect(rows).toHaveLength(21);
+    expect(rows.find((row) => row.label === 'Bitrate del stream')).toMatchObject({
+      current: '8000',
+      applyMethod: 'automatic',
+    });
+    expect(rows.find((row) => row.label === 'Bitrate de grabacion')).toMatchObject({
+      current: '40000',
+      applyMethod: 'automatic',
+    });
+    expect(rows.find((row) => row.label === 'Control de tasa del stream')?.current).toBe('CBR');
+    expect(rows.find((row) => row.label === 'Perfil de grabacion')).toMatchObject({
+      current: 'main10',
+      recommended: 'main10',
+    });
+    expect(rows.filter((row) => row.applyMethod === 'manual')).toHaveLength(0);
+  });
 });
 
 describe('formatEncoderName', () => {

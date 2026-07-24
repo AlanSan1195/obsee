@@ -54,4 +54,19 @@ describe('parseGoal', () => {
       fps: 60,
     });
   });
+
+  it('asocia cada resolucion con la instruccion concreta aunque el modo se mencione antes', () => {
+    const result = parseGoal(
+      'Dame mi configuracion perfecta de OBS para STREMEAR Y GRABAR mi partida al mismo tiempo: '
+      + 'mi hardware es una MINI M4 CON 10 CPU Y GPU NUCLEOS de 16 GB DE RAM, una PS5 PRO, '
+      + 'una CAPTURADORA EL GATO 4K X y un MONITOR OLED LG C2. '
+      + 'Quiero stremear a 1080p y grabar mi partida en calidad 4K para despues subirla a YouTube a 60fps.',
+    );
+
+    expect(result.preferences).toMatchObject({
+      streamResolution: '1920x1080',
+      recordingResolution: '3840x2160',
+      fps: 60,
+    });
+  });
 });

@@ -89,12 +89,13 @@ export function normalizeConsoleProfileForRequest(
     request.goal?.fps ?? response.recommendations.fps,
     verifiedCaptureFps,
   );
+  const finalStreamBitrate = getStreamBitrate(request.platform, streamResolution, finalFps);
   const captureMatch = hasVerifiedCaptureCaps
     ? `La **${consoleInfo.name}** y la capturadora hacen match en **${verifiedCaptureResolution} a ${verifiedCaptureFps} FPS**, capacidad comprobada directamente por OBS.`
     : `La **${consoleInfo.name}** y la capturadora se ajustaron al techo seguro de **${verifiedCaptureResolution} a ${verifiedCaptureFps} FPS**.`;
   const streamMatch = request.mode === 'record_only'
     ? ''
-    : `El **stream ${streamResolution} a ${response.recommendations.bitrate} kbps** adapta esa señal a ${request.platform} para priorizar una emision estable.`;
+    : `El **stream ${streamResolution} a ${finalStreamBitrate} kbps** adapta esa señal a ${request.platform} para priorizar una emision estable.`;
   const recordingMatch = wantsRecording
     ? `La **grabacion ${recordingResolution} con ${preferredRecordingEncoder.toUpperCase()} a ${recordingBitrate} kbps** conserva mas detalle en el archivo local sin atarla al limite del stream.`
     : '';
@@ -138,7 +139,7 @@ export function normalizeConsoleProfileForRequest(
       recording_resolution: recordingResolution,
       fps: finalFps,
       encoder: preferredEncoder,
-      bitrate: getStreamBitrate(request.platform, streamResolution, finalFps),
+      bitrate: finalStreamBitrate,
       recording_encoder: preferredRecordingEncoder,
       recording_bitrate: recordingBitrate,
     },
